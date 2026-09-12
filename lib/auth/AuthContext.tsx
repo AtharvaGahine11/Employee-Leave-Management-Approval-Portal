@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Role, UserSession } from "@/types";
 import { authService, DEMO_USERS } from "./auth-service";
 
@@ -21,12 +21,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const router = useRouter();
-  const pathname = usePathname();
+
+  const fetchSession = async () => {
+    try {
+      const res = await fetch("/api/auth/session");
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.user) {
+          const sessionUser: UserSession = {
+            id: data.user.id || "usr-emp-001",
+            email: data.user.email || "",
+            role: (data.user.role as Role) || "EMPLOYEE",
+            employeeId: data.user.employeeId || "EMP-1003",
+            name: data.user.name || "Employee User",
+            department: data.user.department || "Engineering",
+            designation: data.user.designation || "Software Engineer",
+          };
+          setUser(sessionUser);
+          if (authService.setSession) authService.setSession(sessionUser);
+          setIsLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      // Fall back to client storage session
+    }
+
+    const localSession = authService.getSession();
+    setUser(localSession);
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    const session = authService.getSession();
-    setUser(session);
-    setIsLoading(false);
+    fetchSession();
   }, []);
 
   const login = async (email: string, password: string) => {

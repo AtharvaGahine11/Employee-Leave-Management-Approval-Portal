@@ -444,8 +444,12 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
 const STORE_KEY_PREFIX = "elap_data_v1_";
 
 class DataStore {
+  private memoryStore: Record<string, any> = {};
+
   private getStorageItem<T>(key: string, defaultVal: T): T {
-    if (typeof window === "undefined") return defaultVal;
+    if (typeof window === "undefined") {
+      return this.memoryStore[key] !== undefined ? this.memoryStore[key] : defaultVal;
+    }
     try {
       const data = localStorage.getItem(STORE_KEY_PREFIX + key);
       return data ? JSON.parse(data) : defaultVal;
@@ -455,6 +459,7 @@ class DataStore {
   }
 
   private setStorageItem<T>(key: string, val: T): void {
+    this.memoryStore[key] = val;
     if (typeof window === "undefined") return;
     try {
       localStorage.setItem(STORE_KEY_PREFIX + key, JSON.stringify(val));
@@ -465,7 +470,12 @@ class DataStore {
   }
 
   public init() {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      if (!this.memoryStore["departments"]) {
+        this.resetToDefaults();
+      }
+      return;
+    }
     if (!localStorage.getItem(STORE_KEY_PREFIX + "departments")) {
       this.resetToDefaults();
     }

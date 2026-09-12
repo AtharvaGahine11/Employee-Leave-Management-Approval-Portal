@@ -95,6 +95,16 @@ export class MockAuthService implements IAuthService {
       return DEMO_USERS["hr@elap.demo"].session;
     }
   }
+
+  setSession(session: UserSession): void {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      } catch (err) {
+        console.error("Failed to set session", err);
+      }
+    }
+  }
 }
 
 // Singleton instance that can be swapped with SupabaseAuthService or NextAuthService later

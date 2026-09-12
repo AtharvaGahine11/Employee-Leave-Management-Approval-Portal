@@ -103,4 +103,5 @@ export interface IAuthService {
   login(email: string, password: string): Promise<{ success: boolean; session?: UserSession; error?: string }>;
   logout(): Promise<void>;
   getSession(): UserSession | null;
+  setSession?(session: UserSession): void;
 }

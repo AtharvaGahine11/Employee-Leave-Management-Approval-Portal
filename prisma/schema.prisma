@@ -1,5 +1,5 @@
 // ELAP - Employee Leave Management & Approval Portal
-// PostgreSQL-compatible Prisma Schema
+// Production-Ready Prisma Schema (PostgreSQL Compatible)
 
 generator client {
   provider = "prisma-client-js"
@@ -17,12 +17,13 @@ enum Role {
 }
 
 enum LeaveType {
-  CASUAL_LEAVE  // CL (12 days)
-  SICK_LEAVE    // SL (12 days)
-  EARNED_LEAVE  // EL (15 days)
+  CASUAL_LEAVE  // CL (12 days default)
+  SICK_LEAVE    // SL (12 days default)
+  EARNED_LEAVE  // EL (15 days default)
 }
 
 enum LeaveStatus {
+  DRAFT
   PENDING_MANAGER
   PENDING_HR
   APPROVED
@@ -38,6 +39,9 @@ enum AuditAction {
   HR_APPROVED
   HR_REJECTED
   LEAVE_CANCELLED
+  COMMENT_ADDED
+  ATTACHMENT_UPLOADED
+  USER_LOGIN
 }
 
 model User {
@@ -56,6 +60,7 @@ model Department {
   code        String     @unique // e.g. "ENG", "PROD", "HR", "FIN", "SALES", "MKTG", "OPS", "CS"
   name        String     @unique // Engineering, Product, Human Resources, Finance, Sales, Marketing, Operations, Customer Support
   description String?
+  isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -77,17 +82,20 @@ model Employee {
   isActive           Boolean        @default(true)
   phone              String?
 
-  // Self-referential manager relationship
+  // Self-referential reporting manager relationship
   managerId          String?
   manager            Employee?      @relation("ReportingHierarchy", fields: [managerId], references: [id])
   directReports      Employee[]     @relation("ReportingHierarchy")
 
-  // Leave records
+  // Leave records & audit
   balances           LeaveBalance[]
   leaveRequests      LeaveRequest[] @relation("ApplicantRequests")
   reviewedAsManager  LeaveRequest[] @relation("ManagerReviews")
   reviewedAsHr       LeaveRequest[] @relation("HrReviews")
   auditLogs          LeaveAuditLog[]
+  comments           LeaveComment[]
+  attachments        LeaveAttachment[]
+  notifications      Notification[]
 
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
@@ -109,44 +117,87 @@ model LeaveBalance {
 }
 
 model LeaveRequest {
-  id              String         @id @default(uuid())
-  requestId       String         @unique // e.g. "LR-2026-001"
+  id              String            @id @default(uuid())
+  requestId       String            @unique // e.g. "LR-2026-001"
   employeeId      String
-  employee        Employee       @relation("ApplicantRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        Employee          @relation("ApplicantRequests", fields: [employeeId], references: [id], onDelete: Cascade)
   leaveType       LeaveType
   startDate       DateTime
   endDate         DateTime
   totalDays       Int
   reason          String
-  status          LeaveStatus    @default(PENDING_MANAGER)
+  status          LeaveStatus       @default(PENDING_MANAGER)
 
   // Manager Approval tier
   managerId       String?
-  manager         Employee?      @relation("ManagerReviews", fields: [managerId], references: [id])
+  manager         Employee?         @relation("ManagerReviews", fields: [managerId], references: [id])
   managerActionAt DateTime?
   managerRemarks  String?
 
   // HR Approval tier
   hrId            String?
-  hr              Employee?      @relation("HrReviews", fields: [hrId], references: [id])
+  hr              Employee?         @relation("HrReviews", fields: [hrId], references: [id])
   hrActionAt      DateTime?
   hrRemarks       String?
 
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  cancelledAt     DateTime?
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   auditLogs       LeaveAuditLog[]
+  comments        LeaveComment[]
+  attachments     LeaveAttachment[]
 }
 
-model LeaveAuditLog {
+model LeaveComment {
   id             String       @id @default(uuid())
   leaveRequestId String
   leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         Employee     @relation(fields: [authorId], references: [id])
+  authorRole     Role
+  comment        String
+  createdAt      DateTime     @default(now())
+}
+
+model LeaveAttachment {
+  id             String       @id @default(uuid())
+  leaveRequestId String
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  uploaderId     String
+  uploader       Employee     @relation(fields: [uploaderId], references: [id])
+  fileUrl        String
+  fileName       String
+  fileType       String
+  fileSize       Int
+  createdAt      DateTime     @default(now())
+}
+
+model LeaveAuditLog {
+  id             String        @id @default(uuid())
+  leaveRequestId String?
+  leaveRequest   LeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
   actorId        String
-  actor          Employee     @relation(fields: [actorId], references: [id])
+  actor          Employee      @relation(fields: [actorId], references: [id])
   action         AuditAction
+  entityType     String        @default("LeaveRequest")
+  entityId       String?
   previousStatus LeaveStatus?
-  newStatus      LeaveStatus
+  newStatus      LeaveStatus?
   remarks        String?
-  timestamp      DateTime     @default(now())
+  metadata       String?       // JSON stringified optional metadata
+  timestamp      DateTime      @default(now())
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  recipientId String
+  recipient   Employee  @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  type        String    @default("INFO") // INFO, SUCCESS, WARNING, DANGER
+  isRead      Boolean   @default(false)
+  link        String?
+  createdAt   DateTime  @default(now())
 }
