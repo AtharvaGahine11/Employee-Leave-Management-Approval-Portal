@@ -1,0 +1,152 @@
+// ELAP - Employee Leave Management & Approval Portal
+// PostgreSQL-compatible Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  HR
+}
+
+enum LeaveType {
+  CASUAL_LEAVE  // CL (12 days)
+  SICK_LEAVE    // SL (12 days)
+  EARNED_LEAVE  // EL (15 days)
+}
+
+enum LeaveStatus {
+  PENDING_MANAGER
+  PENDING_HR
+  APPROVED
+  REJECTED_BY_MANAGER
+  REJECTED_BY_HR
+  CANCELLED
+}
+
+enum AuditAction {
+  LEAVE_SUBMITTED
+  MANAGER_APPROVED
+  MANAGER_REJECTED
+  HR_APPROVED
+  HR_REJECTED
+  LEAVE_CANCELLED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(EMPLOYEE)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  employee     Employee?
+}
+
+model Department {
+  id          String     @id @default(uuid())
+  code        String     @unique // e.g. "ENG", "PROD", "HR", "FIN", "SALES", "MKTG", "OPS", "CS"
+  name        String     @unique // Engineering, Product, Human Resources, Finance, Sales, Marketing, Operations, Customer Support
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  employees   Employee[]
+}
+
+model Employee {
+  id                 String         @id @default(uuid())
+  employeeId         String         @unique // e.g. "EMP-1001"
+  name               String
+  email              String         @unique
+  userId             String         @unique
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId       String
+  department         Department     @relation(fields: [departmentId], references: [id])
+  designation        String
+  role               Role           @default(EMPLOYEE)
+  joiningDate        DateTime
+  isActive           Boolean        @default(true)
+  phone              String?
+
+  // Self-referential manager relationship
+  managerId          String?
+  manager            Employee?      @relation("ReportingHierarchy", fields: [managerId], references: [id])
+  directReports      Employee[]     @relation("ReportingHierarchy")
+
+  // Leave records
+  balances           LeaveBalance[]
+  leaveRequests      LeaveRequest[] @relation("ApplicantRequests")
+  reviewedAsManager  LeaveRequest[] @relation("ManagerReviews")
+  reviewedAsHr       LeaveRequest[] @relation("HrReviews")
+  auditLogs          LeaveAuditLog[]
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model LeaveBalance {
+  id           String    @id @default(uuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType    LeaveType
+  year         Int       @default(2026)
+  annualQuota  Int
+  usedDays     Int       @default(0)
+  pendingDays  Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([employeeId, leaveType, year])
+}
+
+model LeaveRequest {
+  id              String         @id @default(uuid())
+  requestId       String         @unique // e.g. "LR-2026-001"
+  employeeId      String
+  employee        Employee       @relation("ApplicantRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType       LeaveType
+  startDate       DateTime
+  endDate         DateTime
+  totalDays       Int
+  reason          String
+  status          LeaveStatus    @default(PENDING_MANAGER)
+
+  // Manager Approval tier
+  managerId       String?
+  manager         Employee?      @relation("ManagerReviews", fields: [managerId], references: [id])
+  managerActionAt DateTime?
+  managerRemarks  String?
+
+  // HR Approval tier
+  hrId            String?
+  hr              Employee?      @relation("HrReviews", fields: [hrId], references: [id])
+  hrActionAt      DateTime?
+  hrRemarks       String?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  auditLogs       LeaveAuditLog[]
+}
+
+model LeaveAuditLog {
+  id             String       @id @default(uuid())
+  leaveRequestId String
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  actorId        String
+  actor          Employee     @relation(fields: [actorId], references: [id])
+  action         AuditAction
+  previousStatus LeaveStatus?
+  newStatus      LeaveStatus
+  remarks        String?
+  timestamp      DateTime     @default(now())
+}
