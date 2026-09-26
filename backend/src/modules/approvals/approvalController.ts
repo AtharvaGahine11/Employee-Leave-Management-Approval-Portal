@@ -47,6 +47,7 @@ export const getManagerLeaves = asyncHandler(async (req: Request, res: Response)
         },
       },
       approvals: true,
+      attachments: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -303,6 +304,7 @@ export const getHrLeaves = asyncHandler(async (req: Request, res: Response) => {
       approvals: {
         include: { approver: { select: { name: true, role: true } } },
       },
+      attachments: true,
     },
     orderBy: { createdAt: 'desc' },
   });

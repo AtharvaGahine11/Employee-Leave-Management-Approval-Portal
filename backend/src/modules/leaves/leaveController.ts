@@ -161,6 +161,7 @@ export const getEmployeeLeaves = asyncHandler(async (req: Request, res: Response
           approver: { select: { id: true, name: true, role: true } },
         },
       },
+      attachments: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -232,9 +233,9 @@ export const getLeaveDetails = asyncHandler(async (req: Request, res: Response) 
     throw new AppError('Leave request not found.', 404, 'REQUEST_NOT_FOUND');
   }
 
-  // Record-level authorization check
+  // Record-level authorization check: Applicant, ANY Manager, or ANY HR can view details
   const isApplicant = leaveRequest.employeeId === currentUser.id;
-  const isManager = currentUser.role === Role.MANAGER && leaveRequest.employee.managerId === currentUser.id;
+  const isManager = currentUser.role === Role.MANAGER;
   const isHR = currentUser.role === Role.HR;
 
   if (!isApplicant && !isManager && !isHR) {

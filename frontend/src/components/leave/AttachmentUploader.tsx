@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Attachment } from '../../types';
 import { attachmentApi } from '../../api';
-import { Paperclip, Upload, FileText, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { Paperclip, Upload, FileText, Image as ImageIcon, ExternalLink, Eye } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
+import { FilePreviewModal } from '../common/FilePreviewModal';
 
 interface AttachmentUploaderProps {
   requestId: string;
@@ -17,6 +18,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
 }) => {
   const [attachments, setAttachments] = useState<Attachment[]>(initialAttachments);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const { showSuccess, showError } = useToast();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,37 +76,63 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
             No attachments uploaded. (Medical certificate required for Sick Leave ≥3 days)
           </p>
         ) : (
-          attachments.map((att) => {
+          attachments.map((att, idx) => {
             const isImage = att.mimeType.startsWith('image/');
             return (
               <div
-                key={att.id}
-                className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-colors text-xs"
+                key={att.id || idx}
+                onClick={() => setPreviewIndex(idx)}
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-indigo-50/40 hover:border-indigo-200 transition-colors text-xs cursor-pointer group"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                     {isImage ? <ImageIcon className="w-4 h-4 text-sky-600" /> : <FileText className="w-4 h-4 text-rose-600" />}
                   </div>
                   <div className="truncate">
-                    <p className="font-semibold text-slate-900 truncate">{att.fileName}</p>
+                    <p className="font-semibold text-slate-900 group-hover:text-indigo-700 truncate transition-colors">
+                      {att.fileName}
+                    </p>
                     <p className="text-3xs text-slate-500">
                       {(att.size / 1024).toFixed(1)} KB • {att.mimeType}
                     </p>
                   </div>
                 </div>
-                <a
-                  href={att.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-md hover:bg-white transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewIndex(idx)}
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-white transition-colors"
+                    title="Preview Full Document"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <a
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-white transition-colors"
+                    title="Open in New Tab"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* File Preview Modal */}
+      {previewIndex !== null && (
+        <FilePreviewModal
+          isOpen={previewIndex !== null}
+          onClose={() => setPreviewIndex(null)}
+          attachments={attachments}
+          requestId={requestId}
+          initialIndex={previewIndex}
+        />
+      )}
     </div>
   );
 };

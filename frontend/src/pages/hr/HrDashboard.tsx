@@ -27,7 +27,9 @@ import {
   Eye,
   CheckCircle,
   ShieldAlert,
+  Paperclip,
 } from 'lucide-react';
+import { FilePreviewModal } from '../../components/common/FilePreviewModal';
 
 export const HrDashboard: React.FC = () => {
   const { showSuccess, showError } = useToast();
@@ -44,6 +46,13 @@ export const HrDashboard: React.FC = () => {
   const [selectedReq, setSelectedReq] = useState<LeaveRequest | null>(null);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
+
+  // File Preview Modal state
+  const [previewModalData, setPreviewModalData] = useState<{
+    attachments: LeaveRequest['attachments'];
+    employeeName: string;
+    requestId: string;
+  } | null>(null);
 
   const fetchReports = async (deptId?: string) => {
     try {
@@ -357,6 +366,24 @@ export const HrDashboard: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Attachment preview trigger */}
+                  {req.attachments && req.attachments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewModalData({
+                          attachments: req.attachments,
+                          employeeName: req.employee.name,
+                          requestId: req.requestId,
+                        })
+                      }
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200/80 transition-colors shadow-2xs"
+                    >
+                      <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>View Attachment ({req.attachments.length})</span>
+                    </button>
+                  )}
+
                   <div className="flex items-center gap-2 pt-1">
                     <Link
                       to={`/employee/leaves/${req.id}`}
@@ -399,6 +426,7 @@ export const HrDashboard: React.FC = () => {
                     <th className="px-4 py-3">Type</th>
                     <th className="px-4 py-3">Duration</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Attachments</th>
                     <th className="px-4 py-3 text-right">Quick Decision</th>
                   </tr>
                 </thead>
@@ -427,8 +455,45 @@ export const HrDashboard: React.FC = () => {
                       <td className="px-4 py-3">
                         <StatusBadge status={req.status} size="sm" />
                       </td>
+                      <td className="px-4 py-3">
+                        {req.attachments && req.attachments.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewModalData({
+                                attachments: req.attachments,
+                                employeeName: req.employee.name,
+                                requestId: req.requestId,
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200/80 transition-all shadow-2xs group"
+                            title="Click to preview employee's files"
+                          >
+                            <Paperclip className="w-3.5 h-3.5 text-indigo-600 group-hover:scale-110 transition-transform" />
+                            <span>{req.attachments.length} {req.attachments.length === 1 ? 'File' : 'Files'}</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 text-3xs italic">None</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {req.attachments && req.attachments.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewModalData({
+                                  attachments: req.attachments,
+                                  employeeName: req.employee.name,
+                                  requestId: req.requestId,
+                                })
+                              }
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-200"
+                              title="Preview Attachment"
+                            >
+                              <Paperclip className="w-4 h-4" />
+                            </button>
+                          )}
                           <Link
                             to={`/employee/leaves/${req.id}`}
                             className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -497,6 +562,17 @@ export const HrDashboard: React.FC = () => {
             employeeName={selectedReq.employee.name}
           />
         </>
+      )}
+
+      {/* File Preview Modal */}
+      {previewModalData && (
+        <FilePreviewModal
+          isOpen={!!previewModalData}
+          onClose={() => setPreviewModalData(null)}
+          attachments={previewModalData.attachments}
+          employeeName={previewModalData.employeeName}
+          requestId={previewModalData.requestId}
+        />
       )}
     </Layout>
   );
