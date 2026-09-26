@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import authRoutes from '../modules/auth/authRoutes.js';
 import employeeRoutes from '../modules/employees/employeeRoutes.js';
 import departmentRoutes from '../modules/departments/departmentRoutes.js';
@@ -14,7 +14,7 @@ import scheduledJobRoutes from '../modules/scheduledJobs/scheduledJobRoutes.js';
 const router = Router();
 
 // Health check endpoint
-router.get('/health', (req, res) => {
+router.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'UP',
     system: 'ELAP API Backend',

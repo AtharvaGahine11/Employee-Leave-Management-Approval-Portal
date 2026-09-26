@@ -14,6 +14,18 @@ if (config.supabase.url && supabaseKey) {
   logger.info(`📦 Supabase Storage credentials not detected; using base64 data URI fallback mode.`);
 }
 
+export interface MulterFile {
+  fieldname?: string;
+  originalname: string;
+  encoding?: string;
+  mimetype: string;
+  size?: number;
+  destination?: string;
+  filename?: string;
+  path?: string;
+  buffer: Buffer;
+}
+
 export interface UploadResult {
   url: string;
   publicId: string;
@@ -24,7 +36,7 @@ export interface UploadResult {
  * Uploads a file buffer to Supabase Storage bucket with automated fallback
  */
 export const uploadFileToStorage = async (
-  file: Express.Multer.File,
+  file: MulterFile,
   folder = 'leave-attachments'
 ): Promise<UploadResult> => {
   const bucketName = config.supabase.bucket || 'leave-attachments';
