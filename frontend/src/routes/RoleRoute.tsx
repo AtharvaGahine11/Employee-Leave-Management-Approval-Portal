@@ -19,8 +19,12 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({ allowedRoles, children }) 
     );
   }
 
-  if (!user || !hasRole(allowedRoles)) {
-    return <Navigate to="/" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!hasRole(allowedRoles)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

@@ -17,20 +17,31 @@ import {
   ShieldCheck,
   Sparkles,
   AtSign,
+  UserCheck,
 } from 'lucide-react';
+import { validateWorkEmail } from '../../utils/workEmailSecurity';
+import { DEFAULT_DEPARTMENTS } from '../../constants/departments';
+import { getDashboardPathForRole } from '../../routes/AppRoutes';
 
 export const RegisterPage: React.FC = () => {
-  const { register } = useAuth();
+  const { user, register } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate(getDashboardPathForRole(user.role), { replace: true });
+    }
+  }, [user, navigate]);
+
   const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'HR'>('EMPLOYEE');
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departments, setDepartments] = useState<Department[]>(DEFAULT_DEPARTMENTS);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
+  const [departmentId, setDepartmentId] = useState<string>(DEFAULT_DEPARTMENTS[0].id);
   const [designation, setDesignation] = useState('');
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -40,13 +51,15 @@ export const RegisterPage: React.FC = () => {
     const fetchDepts = async () => {
       try {
         const data = await departmentApi.getDepartments();
-        const activeDepts = data.filter((d) => d.active);
-        setDepartments(activeDepts);
-        if (activeDepts.length > 0) {
-          setDepartmentId(activeDepts[0].id);
+        if (Array.isArray(data) && data.length > 0) {
+          const activeDepts = data.filter((d) => d.active);
+          setDepartments(activeDepts);
+          if (!departmentId || !activeDepts.some((d) => d.id === departmentId)) {
+            setDepartmentId(activeDepts[0].id);
+          }
         }
       } catch (err) {
-        console.error('Failed to load departments:', err);
+        console.warn('Using default departments list:', err);
       }
     };
     fetchDepts();
@@ -66,9 +79,16 @@ export const RegisterPage: React.FC = () => {
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      showError('Please enter a valid email address.');
+      showError('Please enter a valid work email address.');
       return;
     }
+
+    const emailCheck = validateWorkEmail(email, role);
+    if (!emailCheck.isValid) {
+      showError(emailCheck.error || 'Please enter an authorized work email address.');
+      return;
+    }
+
     if (password.length < 6) {
       showError('Password must be at least 6 characters.');
       return;
@@ -80,7 +100,7 @@ export const RegisterPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      await register({
+      const newUser = await register({
         name: name.trim(),
         username: cleanUsername,
         email: email.toLowerCase().trim(),
@@ -91,8 +111,8 @@ export const RegisterPage: React.FC = () => {
         phone: phone.trim() || undefined,
       });
 
-      showSuccess(`Account @${cleanUsername} (${role}) created successfully! Welcome to ELAP.`);
-      navigate('/');
+      showSuccess(`Account @${cleanUsername} (${role}) created! A Firebase Auth verification link was dispatched to ${email.trim()}.`);
+      navigate(getDashboardPathForRole(newUser?.role));
     } catch (err: any) {
       console.error(err);
       showError(err.response?.data?.message || 'Failed to create account. Please try again.');
@@ -159,53 +179,59 @@ export const RegisterPage: React.FC = () => {
 
           {/* Role Selector: Employee, Manager, HR Lead */}
           <div>
-            <label className="block text-3xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-              Account Type / Role
+            <label className="block text-2xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              Select Role
             </label>
             <div className="grid grid-cols-3 gap-2">
               {/* Employee Button */}
               <button
                 type="button"
                 onClick={() => setRole('EMPLOYEE')}
-                className={`p-2.5 rounded-2xl border text-center transition-all ${
+                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${
                   role === 'EMPLOYEE'
-                    ? 'border-emerald-600 bg-emerald-50/60 text-emerald-900 shadow-xs ring-2 ring-emerald-500/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/60 text-slate-600 hover:bg-slate-50'
+                    ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <div className="text-base mb-0.5">💻</div>
-                <div className="text-xs font-bold">Employee</div>
-                <div className="text-[10px] text-slate-400">Leave Applicant</div>
+                <UserCheck className={`w-4 h-4 ${role === 'EMPLOYEE' ? 'text-white' : 'text-slate-500'}`} />
+                <span className="text-xs font-semibold leading-none">Employee</span>
+                <span className={`text-3xs ${role === 'EMPLOYEE' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  Applicant
+                </span>
               </button>
 
               {/* Manager Button */}
               <button
                 type="button"
                 onClick={() => setRole('MANAGER')}
-                className={`p-2.5 rounded-2xl border text-center transition-all ${
+                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${
                   role === 'MANAGER'
-                    ? 'border-amber-600 bg-amber-50/60 text-amber-900 shadow-xs ring-2 ring-amber-500/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/60 text-slate-600 hover:bg-slate-50'
+                    ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <div className="text-base mb-0.5">👔</div>
-                <div className="text-xs font-bold">Manager</div>
-                <div className="text-[10px] text-slate-400">Team Approver</div>
+                <Briefcase className={`w-4 h-4 ${role === 'MANAGER' ? 'text-white' : 'text-slate-500'}`} />
+                <span className="text-xs font-semibold leading-none">Manager</span>
+                <span className={`text-3xs ${role === 'MANAGER' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  Approver
+                </span>
               </button>
 
               {/* HR Lead Button */}
               <button
                 type="button"
                 onClick={() => setRole('HR')}
-                className={`p-2.5 rounded-2xl border text-center transition-all ${
+                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 ${
                   role === 'HR'
-                    ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 shadow-xs ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-slate-50/60 text-slate-600 hover:bg-slate-50'
+                    ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <div className="text-base mb-0.5">👑</div>
-                <div className="text-xs font-bold">HR Lead</div>
-                <div className="text-[10px] text-slate-400">Full Sign-off</div>
+                <ShieldCheck className={`w-4 h-4 ${role === 'HR' ? 'text-white' : 'text-slate-500'}`} />
+                <span className="text-xs font-semibold leading-none">HR Lead</span>
+                <span className={`text-3xs ${role === 'HR' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  Sign-off
+                </span>
               </button>
             </div>
           </div>
@@ -338,26 +364,14 @@ export const RegisterPage: React.FC = () => {
                     value={departmentId}
                     onChange={(e) => setDepartmentId(e.target.value)}
                     required
-                    className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-emerald-300 bg-emerald-50/30 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none cursor-pointer"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-emerald-300 bg-white text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
                   >
-                    <option value="" disabled>
-                      Select department...
-                    </option>
                     {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
+                      <option key={dept.id} value={dept.id} className="text-slate-900 py-1">
                         🏢 {dept.name} ({dept.code})
                       </option>
                     ))}
                   </select>
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-emerald-700">
-                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
                 </div>
               </div>
             )}

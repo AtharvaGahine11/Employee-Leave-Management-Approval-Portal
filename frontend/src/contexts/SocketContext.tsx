@@ -28,13 +28,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_API_BASE_URL
-      ? new URL(import.meta.env.VITE_API_BASE_URL).origin
-      : 'http://localhost:5000';
+    let socketUrl = 'http://localhost:5001';
+    if (import.meta.env.VITE_SOCKET_URL) {
+      socketUrl = import.meta.env.VITE_SOCKET_URL;
+    } else if (import.meta.env.PROD && typeof window !== 'undefined') {
+      socketUrl = window.location.origin;
+    } else if (import.meta.env.VITE_API_BASE_URL) {
+      try {
+        socketUrl = new URL(import.meta.env.VITE_API_BASE_URL, window.location.origin).origin;
+      } catch {
+        socketUrl = window.location.origin;
+      }
+    } else if (typeof window !== 'undefined') {
+      socketUrl = window.location.origin;
+    }
 
     const newSocket = io(socketUrl, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
+      reconnectionAttempts: 3,
+      timeout: 5000,
+    });
+
+    newSocket.on('connect_error', (err) => {
+      // Gracefully handle serverless environments without crashing
+      setIsConnected(false);
     });
 
     newSocket.on('connect', () => {

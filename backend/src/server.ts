@@ -22,7 +22,29 @@ initFirebaseAdmin();
 app.use(helmet());
 app.use(
   cors({
-    origin: [config.clientUrl, config.socketOrigin, 'http://localhost:3000'],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin) return callback(null, true);
+
+      // In development, allow all localhost and 127.0.0.1 origins on any port
+      if (
+        config.nodeEnv === 'development' ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin === config.clientUrl ||
+        origin === config.socketOrigin ||
+        origin.endsWith('.vercel.app')
+      ) {
+        return callback(null, true);
+      }
+
+      const allowed = [config.clientUrl, config.socketOrigin, 'http://localhost:3000', 'http://localhost:3001'];
+      if (allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      callback(new Error('Blocked by CORS policy'));
+    },
     credentials: true,
   })
 );
@@ -55,32 +77,36 @@ app.use(errorHandler);
 // 7. Initialize Socket.IO Server Engine
 initSocketIO(server);
 
-// 8. Start HTTP Listener
-const PORT = config.port;
-server.listen(PORT, () => {
-  logger.info(`================================================`);
-  logger.info(`🚀 ELAP Backend Server running on port ${PORT}`);
-  logger.info(`🌍 Environment: ${config.nodeEnv}`);
-  logger.info(`🔑 DEMO_MODE: ${config.demoMode ? 'ENABLED' : 'DISABLED'}`);
-  logger.info(`================================================`);
+// 8. Start HTTP Listener (Only in non-serverless environments)
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+if (!isServerless) {
+  const PORT = config.port;
+  server.listen(PORT, () => {
+    logger.info(`================================================`);
+    logger.info(`🚀 ELAP Backend Server running on port ${PORT}`);
+    logger.info(`🌍 Environment: ${config.nodeEnv}`);
+    logger.info(`🔑 DEMO_MODE: ${config.demoMode ? 'ENABLED' : 'DISABLED'}`);
+    logger.info(`================================================`);
 
-  // Start Background Inaction Check Interval (every 10 minutes)
-  const SLA_CHECK_INTERVAL_MS = 10 * 60 * 1000;
-  setTimeout(async () => {
-    try {
-      await runInactionCheckJob();
-    } catch (err) {
-      logger.error('Initial SLA check error:', err);
-    }
-  }, 10000);
+    // Start Background Inaction Check Interval (every 10 minutes)
+    const SLA_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+    setTimeout(async () => {
+      try {
+        await runInactionCheckJob();
+      } catch (err) {
+        logger.error('Initial SLA check error:', err);
+      }
+    }, 10000);
 
-  setInterval(async () => {
-    try {
-      await runInactionCheckJob();
-    } catch (err) {
-      logger.error('Scheduled SLA check error:', err);
-    }
-  }, SLA_CHECK_INTERVAL_MS);
-});
+    setInterval(async () => {
+      try {
+        await runInactionCheckJob();
+      } catch (err) {
+        logger.error('Scheduled SLA check error:', err);
+      }
+    }, SLA_CHECK_INTERVAL_MS);
+  });
+}
 
+export { app, server };
 export default app;

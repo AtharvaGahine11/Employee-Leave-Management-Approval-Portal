@@ -67,7 +67,7 @@ export const ProfilePage: React.FC = () => {
     >
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Profile Card */}
-        <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
           <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-slate-100">
             <div className="w-20 h-20 rounded-full bg-indigo-600 text-white font-black text-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
               {user?.name ? user.name.charAt(0) : 'U'}
@@ -163,7 +163,7 @@ export const ProfilePage: React.FC = () => {
         </div>
 
         {/* Security & Password Reset Card */}
-        <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+        <div className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
           <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
               <KeyRound className="w-5 h-5" />

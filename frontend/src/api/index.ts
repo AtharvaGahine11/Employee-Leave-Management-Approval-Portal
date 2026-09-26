@@ -43,6 +43,7 @@ export const authApi = {
     designation?: string;
     phone?: string;
     role?: 'EMPLOYEE' | 'MANAGER' | 'HR';
+    firebaseUid?: string;
   }) => {
     const response = await apiClient.post<
       ApiResponse<{ token: string; user: UserProfile; balances: LeaveBalance[] }>
@@ -82,6 +83,7 @@ export const employeeApi = {
     role?: string;
     phone?: string;
     managerId?: string;
+    firebaseUid?: string;
   }) => {
     const response = await apiClient.post<ApiResponse<UserProfile>>('/employees', data);
     return response.data.data;

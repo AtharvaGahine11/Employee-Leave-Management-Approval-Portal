@@ -181,11 +181,11 @@ export const HrDashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full lg:w-auto">
             <button
               onClick={handleRunSlaCheck}
               disabled={isRunningSla}
-              className="px-4 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 flex-shrink-0 disabled:opacity-50"
+              className="px-4 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               title="Executes the automated 48h manager reminder and 72h HR escalation job"
             >
               <RotateCw className={`w-4 h-4 ${isRunningSla ? 'animate-spin' : ''}`} />
@@ -194,7 +194,7 @@ export const HrDashboard: React.FC = () => {
 
             <button
               onClick={() => setShowOnboardModal(true)}
-              className="px-4 py-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 flex-shrink-0"
+              className="px-4 py-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2"
             >
               <UserPlus className="w-4 h-4" />
               <span>Onboard Employee</span>
@@ -203,7 +203,7 @@ export const HrDashboard: React.FC = () => {
             <button
               onClick={handleExportCSV}
               disabled={isExporting}
-              className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 flex-shrink-0 disabled:opacity-50"
+              className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
               {isExporting ? 'Exporting...' : 'Export CSV'}
@@ -329,7 +329,66 @@ export const HrDashboard: React.FC = () => {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Card View (< md) */}
+            <div className="md:hidden space-y-3">
+              {pendingLeaves.map((req) => (
+                <div
+                  key={req.id}
+                  className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-sm text-slate-900">{req.employee.name}</div>
+                      <div className="text-3xs text-slate-500 font-medium">
+                        {req.employee.employeeId} • {req.employee.department.name}
+                      </div>
+                    </div>
+                    <StatusBadge status={req.status} size="sm" />
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-100 text-xs space-y-1">
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-indigo-600 font-bold">{req.leaveType.name}</span>
+                      <span className="text-slate-900 font-bold">{req.daysCount} days</span>
+                    </div>
+                    <div className="text-3xs text-slate-500">
+                      {new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <Link
+                      to={`/employee/leaves/${req.id}`}
+                      className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-xl"
+                      title="Inspect Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setSelectedReq(req);
+                        setIsRejectOpen(true);
+                      }}
+                      className="flex-1 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-xl font-bold text-xs"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedReq(req);
+                        setIsApproveOpen(true);
+                      }}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-2xs"
+                    >
+                      Final Approve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
                   <tr>

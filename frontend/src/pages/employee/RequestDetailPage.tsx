@@ -135,15 +135,15 @@ export const RequestDetailPage: React.FC = () => {
     >
       <div className="space-y-8">
         {/* Top Header Controls */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors w-fit"
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <StatusBadge status={leaveRequest.status} size="lg" />
 
             {canCancel && (

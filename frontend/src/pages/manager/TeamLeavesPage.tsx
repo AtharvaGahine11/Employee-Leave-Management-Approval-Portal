@@ -44,7 +44,7 @@ export const TeamLeavesPage: React.FC = () => {
           </div>
           <button
             onClick={() => setShowOnboardModal(true)}
-            className="px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs transition-all flex items-center justify-center gap-2"
           >
             <UserPlus className="w-4 h-4 text-indigo-400" />
             <span>Onboard Team Member</span>

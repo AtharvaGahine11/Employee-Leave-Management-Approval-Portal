@@ -101,11 +101,11 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ========================================================
           Top Navigation Bar (Clean, Unified, No Duplicate Logo)
           ======================================================== */}
-      <header className="h-16 px-6 sm:px-8 border-b border-slate-100 flex items-center justify-between gap-4">
+      <header className="h-16 px-4 sm:px-8 border-b border-slate-100 flex items-center justify-between gap-3 sm:gap-4">
         {/* Left: Breadcrumbs on Desktop, Brand on Mobile */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {/* Mobile Brand Mark (Sidebar is hidden on mobile) */}
-          <div className="lg:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2 flex-shrink-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center text-white font-extrabold text-xs shadow-xs">
               E
             </div>
@@ -113,18 +113,18 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Desktop Breadcrumb Hierarchy */}
-          <nav className="hidden lg:flex items-center gap-2 text-xs">
+          <nav className="hidden lg:flex items-center gap-2 text-xs truncate">
             <span className="font-semibold text-slate-400">Portal</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-            <span className="font-bold text-slate-900 bg-slate-50 border border-slate-200/60 px-2.5 py-1 rounded-lg">
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+            <span className="font-bold text-slate-900 bg-slate-50 border border-slate-200/60 px-2.5 py-1 rounded-lg truncate">
               {title}
             </span>
           </nav>
         </div>
 
-        {/* Center: Contextual Time Filters (Only shown if page supports filtering) */}
+        {/* Center: Contextual Time Filters (Desktop / Tablet view) */}
         {onFilterChange && (
-          <div className="hidden md:flex items-center gap-1 p-1 bg-slate-100/80 rounded-full text-xs">
+          <div className="hidden sm:flex items-center gap-1 p-1 bg-[#f1f4f9] rounded-full border border-slate-200/80 shadow-2xs text-xs">
             {filterTabs.map((tab) => {
               const isActive = activeFilter === tab;
               return (
@@ -132,10 +132,10 @@ export const Header: React.FC<HeaderProps> = ({
                   key={tab}
                   type="button"
                   onClick={() => onFilterChange(tab)}
-                  className={`px-3 py-1 rounded-full font-semibold transition-all whitespace-nowrap ${
+                  className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all whitespace-nowrap text-xs ${
                     isActive
-                      ? 'bg-slate-950 text-white shadow-xs'
-                      : 'text-slate-500 hover:text-slate-950 hover:bg-white/60'
+                      ? 'bg-[#090D1A] text-white ring-2 ring-blue-600 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950 hover:bg-white/60 font-semibold'
                   }`}
                 >
                   {tab}
@@ -146,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Right Actions: Notifications & Unified User Chip */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {/* Notification Bell */}
           <div className="relative">
             <button
@@ -162,9 +162,9 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* Notification Menu Dropdown */}
+            {/* Notification Menu Dropdown (Clamped to viewport on mobile) */}
             {showBellMenu && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-3xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-slide-up">
+              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm bg-white rounded-3xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-slide-up">
                 <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <span className="text-xs font-bold text-slate-900">Notifications</span>
                   {unreadCount > 0 && (
@@ -191,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
                       >
                         <div className="flex items-center justify-between mb-0.5">
                           <span className="font-semibold text-slate-900 truncate">{n.title}</span>
-                          <span className="text-4xs text-slate-400">
+                          <span className="text-4xs text-slate-400 ml-2 flex-shrink-0">
                             {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
@@ -210,17 +210,17 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Unified User Profile Chip */}
           <Link
             to="/profile"
-            className="flex items-center gap-2.5 p-1 sm:pr-3 rounded-2xl hover:bg-slate-50 border border-transparent hover:border-slate-200/60 transition-all group"
+            className="flex items-center gap-2 p-1 sm:pr-3 rounded-2xl hover:bg-slate-50 border border-transparent hover:border-slate-200/60 transition-all group"
             title="View Profile & Settings"
           >
             <div className="w-8 h-8 rounded-full bg-slate-950 text-white font-bold text-xs flex items-center justify-center shadow-xs flex-shrink-0 group-hover:scale-105 transition-transform">
               {user?.name ? user.name.charAt(0) : 'U'}
             </div>
             <div className="hidden sm:flex flex-col text-left">
-              <span className="text-xs font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors truncate max-w-[150px]">
+              <span className="text-xs font-bold text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors truncate max-w-[140px]">
                 {cleanName}
               </span>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[140px]">
                 {user?.role} • {user?.department?.name || 'Org'}
               </span>
             </div>
@@ -231,15 +231,38 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ========================================================
           Main Page Title Section (Spacious & Clean Hierarchy)
           ======================================================== */}
-      <div className="px-6 sm:px-8 pt-5 pb-5">
+      <div className="px-4 sm:px-8 pt-4 pb-4 sm:pt-5 sm:pb-5">
         {subtitle && (
           <span className="text-2xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
             {subtitle}
           </span>
         )}
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-950 tracking-tight">
           {title}
         </h1>
+
+        {/* Mobile Horizontal Filter Bar (renders directly under title on mobile) */}
+        {onFilterChange && (
+          <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-3 -mx-4 px-4">
+            {filterTabs.map((tab) => {
+              const isActive = activeFilter === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => onFilterChange(tab)}
+                  className={`px-3.5 py-1.5 rounded-full font-bold whitespace-nowrap text-xs transition-all flex-shrink-0 ${
+                    isActive
+                      ? 'bg-[#090D1A] text-white ring-2 ring-blue-600 shadow-xs'
+                      : 'bg-slate-100/80 text-slate-600 font-semibold'
+                  }`}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

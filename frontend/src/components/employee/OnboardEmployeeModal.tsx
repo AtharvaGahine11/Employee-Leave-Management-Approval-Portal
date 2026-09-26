@@ -3,7 +3,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { employeeApi, departmentApi } from '../../api';
 import { Department } from '../../types';
-import { X, UserPlus, Shield, User, Mail, Lock, Building2, Briefcase, Phone } from 'lucide-react';
+import { X, UserPlus, Shield, User, Mail, Lock, Building2, Briefcase, Phone, ShieldCheck } from 'lucide-react';
+import { validateWorkEmail } from '../../utils/workEmailSecurity';
+import { validateAndProvisionWorkEmailWithFirebase } from '../../config/firebase';
+import { DEFAULT_DEPARTMENTS } from '../../constants/departments';
 
 interface OnboardEmployeeModalProps {
   isOpen: boolean;
@@ -19,12 +22,14 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
 
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departments, setDepartments] = useState<Department[]>(DEFAULT_DEPARTMENTS);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('Welcome@2026');
-  const [departmentId, setDepartmentId] = useState('');
+  const [departmentId, setDepartmentId] = useState<string>(
+    user?.role === 'MANAGER' && user.department?.id ? user.department.id : DEFAULT_DEPARTMENTS[0].id
+  );
   const [designation, setDesignation] = useState('');
   const [role, setRole] = useState<'EMPLOYEE' | 'MANAGER' | 'HR'>('EMPLOYEE');
   const [phone, setPhone] = useState('');
@@ -33,16 +38,16 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       departmentApi.getDepartments().then((data) => {
-        setDepartments(data);
-        if (data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
+          setDepartments(data);
           // If Manager, default to their department
           if (user?.role === 'MANAGER' && user.department?.id) {
             setDepartmentId(user.department.id);
-          } else {
+          } else if (!departmentId || !data.some((d) => d.id === departmentId)) {
             setDepartmentId(data[0].id);
           }
         }
-      }).catch((err) => console.error(err));
+      }).catch((err) => console.warn('Using default departments list:', err));
     }
   }, [isOpen, user]);
 
@@ -74,8 +79,42 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
       return;
     }
 
+    // 1. Work Email Security Validation
+    const emailValidation = validateWorkEmail(email, isHr ? role : 'EMPLOYEE');
+    if (!emailValidation.isValid) {
+      showError(emailValidation.error || 'Please enter a valid work email.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      let firebaseUid: string | undefined = undefined;
+      let emailVerificationSent = false;
+
+      // 2. Validate and provision user in Firebase Auth service
+      try {
+        const fbResult = await validateAndProvisionWorkEmailWithFirebase(
+          email.trim(),
+          password,
+          name.trim()
+        );
+        firebaseUid = fbResult.uid;
+        emailVerificationSent = fbResult.emailVerificationSent;
+      } catch (fbErr: any) {
+        if (fbErr?.code === 'auth/email-already-in-use') {
+          showError(`Work email '${email}' is already registered in Firebase Auth.`);
+          setIsSubmitting(false);
+          return;
+        } else if (fbErr?.code === 'auth/invalid-email') {
+          showError(`Firebase Auth rejected '${email}' as an invalid email address.`);
+          setIsSubmitting(false);
+          return;
+        } else {
+          console.warn('Firebase provisioning notice:', fbErr?.message || fbErr);
+        }
+      }
+
+      // 3. Register employee in ELAP database with matching firebaseUid
       await employeeApi.createEmployee({
         name: name.trim(),
         username: username.trim(),
@@ -85,9 +124,16 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
         designation: designation.trim(),
         role: isHr ? role : 'EMPLOYEE',
         phone: phone.trim() || undefined,
+        firebaseUid,
       });
 
-      showSuccess(`Employee ${name} (@${username}) onboarded successfully!`);
+      showSuccess(
+        `Employee ${name} (@${username}) onboarded! ${
+          emailVerificationSent
+            ? 'Firebase verification link dispatched to work email.'
+            : 'Work account active.'
+        }`
+      );
       // Reset form
       setName('');
       setUsername('');
@@ -173,11 +219,16 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
               </div>
             </div>
 
-            {/* Email Address */}
+            {/* Work Email Address with Security Validation */}
             <div>
-              <label className="block text-3xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                Email Address *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-3xs font-bold uppercase tracking-wider text-slate-600">
+                  Work Email *
+                </label>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full">
+                  <ShieldCheck className="w-3 h-3 text-indigo-600" /> Firebase Auth
+                </span>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                   <Mail className="w-4 h-4" />
@@ -186,11 +237,14 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ananya@gmail.com"
+                  placeholder="name@company.com"
                   required
                   className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-slate-950"
                 />
               </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                A verification link will be dispatched to this inbox via Firebase Authentication.
+              </p>
             </div>
           </div>
 
@@ -306,18 +360,18 @@ export const OnboardEmployeeModal: React.FC<OnboardEmployeeModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
+          <div className="pt-3 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-60 flex items-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-60 flex items-center justify-center gap-1.5"
             >
               {isSubmitting ? 'Provisioning...' : 'Create Account'}
             </button>

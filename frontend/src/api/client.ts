@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+const isDev = import.meta.env.DEV;
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
+// In production, fallback to same-domain relative /api/v1 even if localhost was accidentally passed in Vercel
+const API_BASE_URL =
+  !isDev && (!rawBaseUrl || rawBaseUrl.includes('localhost'))
+    ? '/api/v1'
+    : (rawBaseUrl || (isDev ? 'http://localhost:5001/api/v1' : '/api/v1'));
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

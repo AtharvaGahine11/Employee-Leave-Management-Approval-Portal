@@ -5,6 +5,7 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { RoleRoute } from './RoleRoute';
 
 // Pages
+import { LandingPage } from '../pages/landing/LandingPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { EmployeeDashboard } from '../pages/employee/EmployeeDashboard';
@@ -26,24 +27,32 @@ import { HrDepartmentsPage } from '../pages/hr/HrDepartmentsPage';
 import { NotificationsPage } from '../pages/common/NotificationsPage';
 import { NotFoundPage } from '../pages/common/NotFoundPage';
 
+export const getDashboardPathForRole = (role?: string) => {
+  if (role === 'HR') return '/hr/dashboard';
+  if (role === 'MANAGER') return '/manager/dashboard';
+  return '/employee/dashboard';
+};
+
 export const RootRedirect: React.FC = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
 
-  if (user.role === 'HR') return <Navigate to="/hr/dashboard" replace />;
-  if (user.role === 'MANAGER') return <Navigate to="/manager/dashboard" replace />;
-  return <Navigate to="/employee/dashboard" replace />;
+  return <Navigate to={getDashboardPathForRole(user.role)} replace />;
 };
 
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
+      {/* Public Apex Landing Page */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Auth Routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* Root Role Redirect */}
+      {/* Authenticated Dashboard Redirect Shortcut */}
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <RootRedirect />

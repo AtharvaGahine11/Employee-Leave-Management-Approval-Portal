@@ -8,7 +8,12 @@ let io: Server | null = null;
 export const initSocketIO = (server: HttpServer): Server => {
   io = new Server(server, {
     cors: {
-      origin: [config.clientUrl, config.socketOrigin, 'http://localhost:3000'],
+      origin: (origin: any, callback: any) => {
+        if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          return callback(null, true);
+        }
+        callback(null, true);
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true,
     },

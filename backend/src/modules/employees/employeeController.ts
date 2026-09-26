@@ -5,6 +5,8 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { getEmployeeLeaveBalances } from '../balances/balanceService.js';
 import { logger } from '../../utils/logger.js';
+import { getFirebaseAdmin } from '../../config/firebase.js';
+import { validateWorkEmail } from '../../utils/workEmailSecurity.js';
 
 export const getProfile = asyncHandler(async (req: Request, res: Response) => {
   const employeeId = req.user?.id;
@@ -77,6 +79,7 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
     role,
     phone,
     managerId,
+    firebaseUid: clientFirebaseUid,
   } = req.body;
 
   let assignedRole = 'EMPLOYEE';
@@ -105,6 +108,16 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
 
   const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_.]/g, '');
   const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Work Email Security Validation
+  const emailValidation = validateWorkEmail(cleanEmail, assignedRole);
+  if (!emailValidation.isValid) {
+    throw new AppError(
+      emailValidation.error || 'Please provide a valid work email address.',
+      400,
+      'INVALID_WORK_EMAIL'
+    );
+  }
 
   if (cleanUsername.length < 3) {
     throw new AppError(
@@ -138,7 +151,28 @@ export const createEmployee = asyncHandler(async (req: Request, res: Response) =
   const count = await prisma.employee.count();
   const year = new Date().getFullYear();
   const employeeId = `EMP-${year}-${String(count + 1).padStart(4, '0')}`;
-  const firebaseUid = `uid_${cleanUsername}_${Date.now()}`;
+  
+  // 2. Firebase Auth Identity Mapping
+  let firebaseUid = clientFirebaseUid || `uid_${cleanUsername}_${Date.now()}`;
+
+  // Provision in Firebase Auth via Admin SDK if client UID not passed
+  if (!clientFirebaseUid) {
+    const firebaseAdmin = getFirebaseAdmin();
+    if (firebaseAdmin) {
+      try {
+        const fbUser = await firebaseAdmin.auth().createUser({
+          email: cleanEmail,
+          password,
+          displayName: name.trim(),
+        });
+        firebaseUid = fbUser.uid;
+        logger.info(`🔥 Provisioned user in Firebase Auth via Admin: ${cleanEmail} (${firebaseUid})`);
+      } catch (fbErr: any) {
+        logger.warn('Firebase Admin createUser notice:', fbErr?.message || fbErr);
+      }
+    }
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
 
   // Create employee in database

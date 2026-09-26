@@ -1,17 +1,27 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, LeaveBalance, Role } from '../types';
 import { authApi, leaveApi } from '../api';
-import { auth, signInWithEmailAndPassword, signOut, signInWithPopup, googleProvider, appleProvider } from '../config/firebase';
+import {
+  auth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut,
+  signInWithPopup,
+  googleProvider,
+  appleProvider,
+  sendEmailVerification,
+} from '../config/firebase';
 
 interface AuthContextType {
   user: UserProfile | null;
   balances: LeaveBalance[];
   token: string | null;
   isLoading: boolean;
-  login: (identifier: string, password?: string) => Promise<void>;
-  register: (data: Parameters<typeof authApi.register>[0]) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  loginWithApple: () => Promise<void>;
+  login: (identifier: string, password?: string) => Promise<UserProfile>;
+  register: (data: Parameters<typeof authApi.register>[0]) => Promise<UserProfile>;
+  loginWithGoogle: () => Promise<UserProfile>;
+  loginWithApple: () => Promise<UserProfile>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => void;
   refreshBalances: () => Promise<void>;
@@ -50,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initSession();
   }, [token]);
 
-  const login = async (identifier: string, password?: string) => {
+  const login = async (identifier: string, password?: string): Promise<UserProfile> => {
     setIsLoading(true);
     try {
       const res = await authApi.login(identifier.trim(), password);
@@ -58,12 +68,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       setBalances(res.balances);
+      return res.user;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<UserProfile> => {
     setIsLoading(true);
     try {
       const credential = await signInWithPopup(auth, googleProvider);
@@ -75,12 +86,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       setBalances(res.balances);
+      return res.user;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loginWithApple = async () => {
+  const loginWithApple = async (): Promise<UserProfile> => {
     setIsLoading(true);
     try {
       const credential = await signInWithPopup(auth, appleProvider);
@@ -92,19 +104,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       setBalances(res.balances);
+      return res.user;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (data: Parameters<typeof authApi.register>[0]) => {
+  const register = async (data: Parameters<typeof authApi.register>[0]): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      const res = await authApi.register(data);
+      let firebaseUid: string | undefined = undefined;
+
+      // 1. Create user directly in Firebase Auth (registers in Firebase Console)
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        firebaseUid = cred.user.uid;
+        if (data.name) {
+          await updateProfile(cred.user, { displayName: data.name });
+        }
+        // Dispatch Firebase email verification link to work email
+        try {
+          await sendEmailVerification(cred.user);
+        } catch (verifErr) {
+          console.warn('Firebase sendEmailVerification notice:', verifErr);
+        }
+      } catch (fbErr: any) {
+        console.warn('Firebase client signup notice:', fbErr?.code || fbErr?.message || fbErr);
+      }
+
+      // 2. Register in system DB with matching firebaseUid
+      const res = await authApi.register({ ...data, firebaseUid });
       localStorage.setItem('elap_token', res.token);
       setToken(res.token);
       setUser(res.user);
       setBalances(res.balances);
+      return res.user;
     } finally {
       setIsLoading(false);
     }

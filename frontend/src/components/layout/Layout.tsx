@@ -18,7 +18,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onFilterChange,
 }) => {
   return (
-    <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col lg:flex-row text-slate-900 selection:bg-slate-900 selection:text-white pb-20 lg:pb-0">
+    <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col lg:flex-row text-slate-900 selection:bg-slate-900 selection:text-white pb-24 lg:pb-0 overflow-x-hidden">
       {/* Desktop Slim Icon Dock */}
       <Sidebar />
 

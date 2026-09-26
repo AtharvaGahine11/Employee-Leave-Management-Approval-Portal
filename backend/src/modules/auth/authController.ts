@@ -8,6 +8,7 @@ import { AppError } from '../../middleware/errorHandler.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { getEmployeeLeaveBalances } from '../balances/balanceService.js';
 import { logger } from '../../utils/logger.js';
+import { validateWorkEmail } from '../../utils/workEmailSecurity.js';
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { identifier, email, username, password } = req.body;
@@ -322,7 +323,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const { name, username, email, password, departmentId, designation, phone, role } = req.body;
+  const { name, username, email, password, departmentId, designation, phone, role, firebaseUid: clientFirebaseUid } = req.body;
 
   const targetRole = (role || 'EMPLOYEE').toUpperCase().trim();
   const validRoles = ['EMPLOYEE', 'MANAGER', 'HR'];
@@ -338,6 +339,12 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9_.]/g, '');
   const cleanEmail = email.toLowerCase().trim();
+
+  // Work Email Security Validation
+  const emailValidation = validateWorkEmail(cleanEmail, userRole);
+  if (!emailValidation.isValid) {
+    throw new AppError(emailValidation.error || 'Please provide a valid work email address.', 400, 'INVALID_WORK_EMAIL');
+  }
 
   if (cleanUsername.length < 3) {
     throw new AppError(
@@ -406,21 +413,23 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   const count = await prisma.employee.count();
   const year = new Date().getFullYear();
   const employeeId = `EMP-${year}-${String(count + 1).padStart(4, '0')}`;
-  let firebaseUid = `uid_${cleanUsername}_${Date.now()}`;
+  let firebaseUid = clientFirebaseUid || `uid_${cleanUsername}_${Date.now()}`;
 
-  // Attempt to provision in Firebase Auth if Admin SDK is connected
-  const firebaseAdmin = getFirebaseAdmin();
-  if (firebaseAdmin) {
-    try {
-      const fbUser = await firebaseAdmin.auth().createUser({
-        email: cleanEmail,
-        password,
-        displayName: name.trim(),
-      });
-      firebaseUid = fbUser.uid;
-      logger.info(`🔥 Provisioned user in Firebase Auth: ${cleanEmail} (${firebaseUid})`);
-    } catch (fbErr: any) {
-      logger.warn('Firebase createUser notice:', fbErr?.message || fbErr);
+  // If client did not provide UID, attempt to provision via Firebase Admin SDK
+  if (!clientFirebaseUid) {
+    const firebaseAdmin = getFirebaseAdmin();
+    if (firebaseAdmin) {
+      try {
+        const fbUser = await firebaseAdmin.auth().createUser({
+          email: cleanEmail,
+          password,
+          displayName: name.trim(),
+        });
+        firebaseUid = fbUser.uid;
+        logger.info(`🔥 Provisioned user in Firebase Auth via Admin: ${cleanEmail} (${firebaseUid})`);
+      } catch (fbErr: any) {
+        logger.warn('Firebase Admin createUser notice:', fbErr?.message || fbErr);
+      }
     }
   }
 

@@ -27,8 +27,8 @@ export const Sidebar: React.FC = () => {
     }`;
 
   const getMobileItemClass = ({ isActive }: { isActive: boolean }) =>
-    `flex flex-col items-center justify-center gap-1 p-2 rounded-2xl transition-all ${
-      isActive ? 'text-indigo-600 font-bold' : 'text-slate-400 hover:text-slate-700'
+    `flex flex-col items-center justify-center gap-0.5 py-1 px-2.5 rounded-xl transition-all ${
+      isActive ? 'text-indigo-600 font-bold bg-indigo-50/80' : 'text-slate-500 hover:text-slate-800'
     }`;
 
   return (
@@ -125,10 +125,7 @@ export const Sidebar: React.FC = () => {
         </div>
       </aside>
 
-      {/* ==========================================
-          MOBILE: Floating Bottom Navigation Dock (< 1024px)
-          ========================================== */}
-      <div className="lg:hidden fixed bottom-3 left-3 right-3 z-50 bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-2xl rounded-3xl px-3 py-2 flex items-center justify-around pb-safe">
+      <div className="lg:hidden fixed bottom-3 inset-x-3 max-w-md mx-auto z-40 bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-2xl rounded-2xl px-2 py-1.5 flex items-center justify-around pb-safe">
         {hasRole('EMPLOYEE') && (
           <>
             <NavLink to="/employee/dashboard" className={getMobileItemClass}>
