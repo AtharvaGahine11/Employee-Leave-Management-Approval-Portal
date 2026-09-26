@@ -16,13 +16,12 @@ import { generateLeaveApprovedEmployeeEmail, generateLeaveApprovedManagerEmail }
 
 export const getManagerLeaves = asyncHandler(async (req: Request, res: Response) => {
   const managerId = req.user!.id;
-  const { status, search } = req.query;
+  const { status, search, scope } = req.query;
 
   const requests = await prisma.leaveRequest.findMany({
     where: {
-      employee: {
-        managerId,
-      },
+      employeeId: { not: managerId },
+      ...(scope === 'team' ? { employee: { managerId } } : {}),
       ...(status ? { status: status as LeaveStatus } : {}),
       ...(search
         ? {
@@ -72,9 +71,13 @@ export const managerApprove = asyncHandler(async (req: Request, res: Response) =
     throw new AppError('Leave request not found.', 404, 'REQUEST_NOT_FOUND');
   }
 
-  // Authorization check: must be reporting manager or HR
-  if (leaveRequest.employee.managerId !== managerId && req.user!.role !== Role.HR) {
-    throw new AppError('You are not authorized to approve leave for this employee.', 403, 'FORBIDDEN');
+  // Authorization check: Any manager or HR can approve tier-1 requests (cannot approve self)
+  if (req.user!.role !== Role.MANAGER && req.user!.role !== Role.HR) {
+    throw new AppError('Only Managers and HR can approve tier-1 leave requests.', 403, 'FORBIDDEN');
+  }
+
+  if (leaveRequest.employeeId === managerId && req.user!.role !== Role.HR) {
+    throw new AppError('Managers cannot approve their own leave requests.', 403, 'SELF_APPROVAL_NOT_ALLOWED');
   }
 
   // Concurrency & Status check: must be PENDING_MANAGER or ESCALATED
@@ -172,8 +175,13 @@ export const managerReject = asyncHandler(async (req: Request, res: Response) =>
     throw new AppError('Leave request not found.', 404, 'REQUEST_NOT_FOUND');
   }
 
-  if (leaveRequest.employee.managerId !== managerId && req.user!.role !== Role.HR) {
-    throw new AppError('You are not authorized to reject leave for this employee.', 403, 'FORBIDDEN');
+  // Authorization check: Any manager or HR can reject tier-1 requests (cannot reject self)
+  if (req.user!.role !== Role.MANAGER && req.user!.role !== Role.HR) {
+    throw new AppError('Only Managers and HR can reject tier-1 leave requests.', 403, 'FORBIDDEN');
+  }
+
+  if (leaveRequest.employeeId === managerId && req.user!.role !== Role.HR) {
+    throw new AppError('Managers cannot reject their own leave requests.', 403, 'SELF_ACTION_NOT_ALLOWED');
   }
 
   if (leaveRequest.status !== LeaveStatus.PENDING_MANAGER && leaveRequest.status !== LeaveStatus.ESCALATED) {

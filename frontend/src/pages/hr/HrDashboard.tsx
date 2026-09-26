@@ -61,12 +61,13 @@ export const HrDashboard: React.FC = () => {
 
   const fetchPendingActions = async () => {
     try {
-      // Fetch both PENDING_HR and ESCALATED requests needing HR attention
-      const [pendingHr, escalated] = await Promise.all([
+      // Fetch all requests needing attention: PENDING_MANAGER, PENDING_HR, and ESCALATED
+      const [pendingManager, pendingHr, escalated] = await Promise.all([
+        approvalApi.getHrLeaves({ status: 'PENDING_MANAGER' as any }),
         approvalApi.getHrLeaves({ status: 'PENDING_HR' as any }),
         approvalApi.getHrLeaves({ status: 'ESCALATED' as any }),
       ]);
-      setPendingLeaves([...pendingHr, ...escalated]);
+      setPendingLeaves([...pendingManager, ...pendingHr, ...escalated]);
     } catch (err) {
       console.error('Failed to load pending HR actions:', err);
     }

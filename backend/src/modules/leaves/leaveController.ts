@@ -6,7 +6,7 @@ import { LeaveStatus, AuditAction, Role } from '../../types/enums.js';
 import { validateLeaveRequest } from './leaveValidation.js';
 import { updatePendingDays, releasePendingDaysOnRejectionOrCancel, getEmployeeLeaveBalances } from '../balances/balanceService.js';
 import { logAudit } from '../audit/auditService.js';
-import { createNotification } from '../notifications/notificationService.js';
+import { createNotification, createRoleNotification } from '../notifications/notificationService.js';
 
 export const createLeaveRequest = asyncHandler(async (req: Request, res: Response) => {
   const employeeId = req.user!.id;
@@ -83,30 +83,51 @@ export const createLeaveRequest = asyncHandler(async (req: Request, res: Respons
     metadata: { requestId: leaveRequest.requestId, daysCount, leaveTypeCode: leaveType.code },
   });
 
-  // Send Notification if submitted
-  if (!isDraft && employee.managerId) {
-    await createNotification({
-      recipientId: employee.managerId,
-      title: 'New Leave Request Pending Review',
-      message: `${employee.name} (${employee.department.name}) submitted a ${leaveType.name} request for ${daysCount} days (${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}).`,
-      type: 'INFO',
-      link: `/manager/approvals`,
-      emailSubject: `[ELAP] Action Required: Leave Request ${leaveRequest.requestId} from ${employee.name}`,
-      emailHtml: `
-        <div style="font-family: sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: #4f46e5;">Leave Request Pending Your Approval</h2>
-          <p>Hi ${employee.manager?.name || 'Manager'},</p>
-          <p><strong>${employee.name}</strong> has submitted a new leave request in ELAP:</p>
-          <ul>
-            <li><strong>Request ID:</strong> ${leaveRequest.requestId}</li>
-            <li><strong>Leave Type:</strong> ${leaveType.name}</li>
-            <li><strong>Dates:</strong> ${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]} (${daysCount} days)</li>
-            <li><strong>Reason:</strong> ${reason}</li>
-          </ul>
-          <p>Please log in to the portal to review and approve or reject this request.</p>
-        </div>
-      `,
-    });
+  // Send Notifications if submitted
+  if (!isDraft) {
+    const notifMsg = `${employee.name} (${employee.department?.name || 'Department'}) submitted a ${leaveType.name} request for ${daysCount} days (${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}).`;
+
+    // 1. Notify ALL Managers
+    await createRoleNotification(
+      'MANAGER',
+      'New Leave Request Pending Review',
+      notifMsg,
+      `/manager/approvals`
+    );
+
+    // 2. Notify ALL HR personnel
+    await createRoleNotification(
+      'HR',
+      'New Leave Request Submitted',
+      notifMsg,
+      `/hr/leaves`
+    );
+
+    // 3. If employee has an assigned manager, also send direct notification & email
+    if (employee.managerId) {
+      await createNotification({
+        recipientId: employee.managerId,
+        title: 'New Leave Request Pending Review',
+        message: notifMsg,
+        type: 'INFO',
+        link: `/manager/approvals`,
+        emailSubject: `[ELAP] Action Required: Leave Request ${leaveRequest.requestId} from ${employee.name}`,
+        emailHtml: `
+          <div style="font-family: sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #4f46e5;">Leave Request Pending Your Approval</h2>
+            <p>Hi ${employee.manager?.name || 'Manager'},</p>
+            <p><strong>${employee.name}</strong> has submitted a new leave request in ELAP:</p>
+            <ul>
+              <li><strong>Request ID:</strong> ${leaveRequest.requestId}</li>
+              <li><strong>Leave Type:</strong> ${leaveType.name}</li>
+              <li><strong>Dates:</strong> ${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]} (${daysCount} days)</li>
+              <li><strong>Reason:</strong> ${reason}</li>
+            </ul>
+            <p>Please log in to the portal to review and approve or reject this request.</p>
+          </div>
+        `,
+      });
+    }
   }
 
   res.status(201).json({
@@ -282,11 +303,30 @@ export const submitDraftRequest = asyncHandler(async (req: Request, res: Respons
     newStatus: LeaveStatus.PENDING_MANAGER,
   });
 
+  const notifMsg = `${draft.employee.name} submitted leave request ${draft.requestId} for ${draft.daysCount} days.`;
+
+  // 1. Notify ALL Managers
+  await createRoleNotification(
+    'MANAGER',
+    'New Leave Request Pending Review',
+    notifMsg,
+    `/manager/approvals`
+  );
+
+  // 2. Notify ALL HRs
+  await createRoleNotification(
+    'HR',
+    'New Leave Request Submitted',
+    notifMsg,
+    `/hr/leaves`
+  );
+
+  // 3. Notify direct manager if assigned
   if (draft.employee.managerId) {
     await createNotification({
       recipientId: draft.employee.managerId,
       title: 'New Leave Request Submitted',
-      message: `${draft.employee.name} submitted leave request ${draft.requestId} for ${draft.daysCount} days.`,
+      message: notifMsg,
       type: 'INFO',
       link: `/manager/approvals`,
     });
