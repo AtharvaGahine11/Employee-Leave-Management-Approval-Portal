@@ -1,192 +1,157 @@
-# Employee Leave Management & Approval Portal (ELAP)
+# ELAP - Employee Leave Management & Approval Portal
 
-ELAP is an enterprise-grade **Employee Leave Management & Approval Portal** built with Next.js 14 App Router, TypeScript, Auth.js (NextAuth.js v5), Prisma ORM, and PostgreSQL. It replaces manual email trails and spreadsheets with a centralized, two-tier leave approval workflow, real-time balance tracking, audit logging, email notifications, CSV reporting, and automated reminders.
+[![Stack](https://img.shields.io/badge/Stack-React_18_%7C_Vite_%7C_Node.js_%7C_Express_%7C_Prisma-4f46e5)](https://github.com/AtharvaGahine11/Employee-Leave-Management-Approval-Portal)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
----
-
-## 🌟 Architecture & Highlights
-
-- **Next.js 14 App Router**: Clean decoupled service-repository architecture using modern Server Components, Route Handlers, and React Server Actions.
-- **Dark Glass Design System**: High-fidelity UI using Vanilla CSS, Tailwind CSS 3.4, and shadcn/ui patterns (`backdrop-blur-2xl`, glass containers, custom glowing badge highlights, responsive mobile console drawer).
-- **PostgreSQL & Prisma ORM**: Normalized relational schema with strict models for `User`, `Department`, `Employee`, `LeaveBalance`, `LeaveRequest`, `LeaveComment`, `LeaveAttachment`, `LeaveAuditLog`, and `Notification`.
-- **Auth.js v5 & JWT Sessions**: Secure Credentials authentication, password hashing with `bcryptjs`, 30-minute inactivity session expiration, and dual-layer RBAC.
-- **Two-Tier Approval Workflow**: Employee submission $\rightarrow$ Manager endorsement $\rightarrow$ Final HR authorization $\rightarrow$ Live quota deduction.
-- **Audit Trail & Governance**: Immutable, append-only audit logging recording every status transition, actor ID, timestamp, and remarks.
-- **Vercel Cron Reminders**: Idempotent background cron jobs sending 48-hour pending reminders and 72-hour manager escalations.
-- **HR Analytics & CSV Export**: Server-side filtering across all 8 corporate departments and instant CSV report export.
+A centralized, production-style, enterprise Web Application for **Employee Leave Management & Approval (ELAP)**. ELAP replaces fragmented email threads and Excel spreadsheets with a structured digital workflow, 2-tier approval engine (`Reporting Manager` → `HR`), real-time balance calculations, automated SLA reminders/escalations, and an immutable audit log across **8 configurable departments**.
 
 ---
 
-## 🚀 Technology Stack
+## 1. Product Overview
 
-| Layer | Technology |
-| :--- | :--- |
-| **Frontend** | Next.js 14.2 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons |
-| **Backend** | Next.js Route Handlers, TypeScript, Service-Repository Architecture |
-| **Database** | PostgreSQL (Supabase compatible), Prisma ORM 5.22 |
-| **Authentication** | Auth.js (NextAuth.js v5), Credentials Provider, `bcryptjs` password hashing |
-| **Email** | Resend API (Event-driven email delivery) |
-| **Storage** | Uploadthing / Cloudinary |
-| **Scheduled Jobs**| Vercel Cron (`/api/cron/reminders`) |
-| **Hosting** | Vercel |
+ELAP serves as the **authoritative system of record** for all organizational leave operations:
+- **Employee**: Create leave requests, view leave balances, save drafts, track real-time request status, add comments, upload medical attachments, and cancel eligible requests.
+- **Reporting Manager**: Tier 1 review action desk to approve or reject team requests with mandatory rejection comments, view team history, and receive 48h SLA reminders.
+- **HR Lead**: HR Command Center with organization-wide visibility across all 8 departments, Tier 2 final approvals with atomic balance deductions, CSV report export, and immutable audit history.
 
 ---
 
-## 📂 Project Structure
+## 2. Key Features
+
+- **2-Tier Approval Workflow Engine**: `EMPLOYEE` → `REPORTING MANAGER` (Tier 1) → `HR` (Tier 2 Final Approval).
+- **Leave Entitlements & Real-Time Balance Engine**:
+  - **CL (Casual Leave)**: 12 days/year, max 3 consecutive days limit.
+  - **SL (Sick Leave)**: 12 days/year, medical certificate attachment required for $\ge 3$ consecutive days.
+  - **EL (Earned Leave)**: 15 days/year, carry-forward up to 30 days, minimum 3 days advance notice.
+  - Formula: $\text{Available Balance} = \text{Opening Balance} - (\text{Approved Leaves} + \text{Pending Leaves})$.
+- **Automated SLA Inaction Rules**:
+  - **48-Hour Manager Inaction**: Automated email & in-portal reminder sent to manager.
+  - **72-Hour Manager Inaction**: Request auto-escalated to `ESCALATED` status on HR Command Center.
+- **Role-Based Access Control (RBAC)**: Strict route and backend record-level data scope guards.
+- **Real-Time WebSockets & Notifications**: Socket.IO event broadcasting for notifications & comment threads.
+- **Immutable Audit Trail**: Append-only log recording every status transition with actor, action, timestamp, and metadata.
+- **HR Reports & CSV Export**: Filtered export matching department, status, leave type, and date range.
+
+---
+
+## 3. Technology Stack
+
+### Frontend
+- **React 18** + **Vite** + **TypeScript**
+- **Tailwind CSS** + **shadcn/ui** visual primitives
+- **React Router v6** (Client-side routing with guards)
+- **Axios** (API HTTP Client with Bearer Token interceptor)
+- **Socket.IO Client** (Real-time WebSockets)
+- **Recharts** (Department breakdown & leave distribution charts)
+- **Lucide React** (Modern enterprise icons)
+
+### Backend
+- **Node.js** + **Express.js** + **TypeScript**
+- **Prisma ORM** (PostgreSQL / Supabase compatible)
+- **Firebase Admin SDK** (ID Token verification)
+- **Socket.IO** (WebSockets server engine)
+- **Resend** (Email notifications)
+- **Cloudinary** (Attachment storage)
+- **Helmet** + **CORS** + **Express Rate Limit** (API Security)
+
+---
+
+## 4. Repository Structure
 
 ```
 ELAP/
-├── app/
-│   ├── api/
-│   │   ├── auth/[...nextauth]/     # NextAuth.js v5 route handler
-│   │   ├── leave-requests/         # Leave CRUD & filtering routes
-│   │   │   └── [id]/
-│   │   │       ├── approve/        # Manager & HR approval route
-│   │   │       ├── reject/         # Rejection with mandatory comments
-│   │   │       ├── cancel/         # Employee cancellation
-│   │   │       └── comments/       # Request discussion thread
-│   │   ├── employees/              # Employee roster endpoints
-│   │   ├── departments/            # Corporate departments endpoint
-│   │   ├── audit-logs/             # Immutable audit log endpoint
-│   │   ├── reports/csv/            # HR CSV report export handler
-│   │   └── cron/reminders/         # Vercel Cron 48h/72h job
-│   ├── approvals/                  # Manager & HR review queue page
-│   ├── audit/                      # Audit trail page (HR)
-│   ├── dashboard/                  # Role-based dashboard router
-│   ├── departments/                # Department overview page (HR)
-│   ├── employees/                  # Employee management page (HR)
-│   ├── leave/
-│   │   ├── apply/                  # Leave application form page
-│   │   └── history/                # Employee leave history page
-│   ├── leave-requests/             # All leave requests page (HR)
-│   ├── login/                      # Login page with 1-click personas
-│   ├── profile/                    # User profile page
-│   └── team/                       # Team roster page (Manager)
-├── components/
-│   ├── dashboard/                  # Employee, Manager & HR dashboard views
-│   ├── layout/                     # AppShell floating sidebar & header
-│   └── ui/                         # Glass UI components (Button, Badge, Card, Modal, Toast)
-├── lib/
-│   ├── auth/                       # Client AuthContext & session helpers
-│   ├── data/                       # Prototype store & seed data structures
-│   ├── server/
-│   │   ├── prisma.ts               # Prisma Client singleton instance
-│   │   ├── services/               # Business logic (leave, balance, approval, audit, cron, report, notification)
-│   │   └── validators/             # Zod validation schemas
-│   └── utils.ts                    # Working days calculator & date formatters
-├── prisma/
-│   ├── schema.prisma               # PostgreSQL Prisma schema
-│   └── seed.ts                     # Database seeder (8 departments, 10 employees, balances)
-├── tests/
-│   └── elap-workflow.test.ts       # Core suite & workflow tests
-├── auth.ts                         # NextAuth v5 configuration
-├── middleware.ts                   # Route protection & server-side RBAC guards
-├── vercel.json                     # Vercel Cron configuration
+├── frontend/             # React + Vite + TypeScript Frontend SPA
+│   ├── src/
+│   │   ├── api/          # Axios HTTP services & endpoints
+│   │   ├── components/   # UI primitives, layout, forms, charts
+│   │   ├── contexts/     # AuthContext, SocketContext, ToastContext
+│   │   ├── pages/        # Employee, Manager, HR portals & Auth
+│   │   ├── routes/       # ProtectedRoute & RoleRoute guards
+│   │   └── types/        # TypeScript interfaces & DTOs
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── backend/              # Node.js + Express + Prisma Backend
+│   ├── prisma/
+│   │   ├── schema.prisma # Complete database schema
+│   │   └── seed.ts       # 8 departments, demo users, sample requests
+│   ├── src/
+│   │   ├── config/       # Env, Prisma, Firebase, Cloudinary, Resend
+│   │   ├── middleware/   # Auth & RBAC guards, central error handler
+│   │   ├── modules/      # Auth, Employees, Leaves, Approvals, Reports, Audit
+│   │   ├── socket/       # Socket.IO connection & room emitters
+│   │   └── server.ts     # Express server entrypoint
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── docs/                 # Architecture, API, Database, Deployment & Testing docs
+├── docker-compose.yml
+├── .env.example
 └── README.md
 ```
 
 ---
 
-## 🔐 Demo User Credentials
+## 5. Local Setup & Quick Start
 
-The portal comes pre-configured with 1-click persona logins on the `/login` page:
+### Prerequisites
+- **Node.js**: v18 or higher
+- **NPM**: v9 or higher
 
-| Role | Name | Email | Password | Primary Capabilities |
-| :--- | :--- | :--- | :--- | :--- |
-| **EMPLOYEE** | Sneha Kulkarni | `employee@elap.demo` | `employee123` | Submit leave requests, check live quota, cancel pending requests, view leave history. |
-| **MANAGER** | Rahul Nair | `manager@elap.demo` | `manager123` | Review team requests (Tier 1 endorsement/rejection with mandatory comments), team roster. |
-| **HR** | Priya Patel | `hr@elap.demo` | `hr123` | Organization-wide visibility across all 8 departments, Tier 2 final sign-off, CSV export, audit trail. |
+### Installation Steps
 
----
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/AtharvaGahine11/Employee-Leave-Management-Approval-Portal.git
+   cd ELAP
+   ```
 
-## ⚙️ Environment Variables Setup
-
-Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-```env
-# Database Configuration (PostgreSQL / Supabase)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/elap_db?schema=public"
-DIRECT_URL="postgresql://postgres:postgres@localhost:5432/elap_db?schema=public"
-
-# Auth.js / NextAuth.js v5 Secrets
-AUTH_SECRET="elap_production_super_secret_jwt_key_2026_change_me"
-NEXTAUTH_URL="http://localhost:3000"
-
-# Email Provider (Resend)
-RESEND_API_KEY="re_placeholder_key_for_development"
-RESEND_FROM_EMAIL="ELAP Notifications <notifications@elap.portal>"
-
-# File Storage
-UPLOADTHING_TOKEN="ut_placeholder_token"
-
-# Vercel Cron Secret
-CRON_SECRET="elap_cron_secure_token_2026"
-```
-
----
-
-## 🛠️ Local Development Setup
-
-1. **Install Dependencies**:
+2. **Install Workspace Dependencies**:
    ```bash
    npm install
    ```
 
-2. **Generate Prisma Client**:
+3. **Configure Environment Variables**:
+   Copy `.env.example` to `backend/.env` and `frontend/.env` (configured with `DEMO_MODE=true` out-of-the-box for instant local testing).
+
+4. **Initialize Database & Seed Demo Data**:
    ```bash
-   npx prisma generate
+   npm run prisma:generate
+   npm run prisma:migrate
+   npm run prisma:seed
    ```
 
-3. **Database Seeding** *(Requires PostgreSQL server running at `DATABASE_URL`)*:
-   ```bash
-   npx prisma db seed
-   ```
-
-4. **Run Local Dev Server**:
+5. **Start Development Servers (Backend + Frontend)**:
    ```bash
    npm run dev
    ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+   - **Frontend App**: `http://localhost:3000`
+   - **Backend API**: `http://localhost:5000/api/v1`
 
 ---
 
-## 🧪 Testing
+## 6. Demo Accounts (1-Click Login)
 
-Run the automated test suite covering working day calculations, Zod validation, mandatory rejection comments, two-tier approval workflow, audit trail logging, CSV report generation, and Cron jobs:
+The login screen features **1-Click Demo Login buttons** for instant evaluation:
 
-```bash
-npx tsx --test tests/elap-workflow.test.ts
-```
-
-Run TypeScript compilation check:
-
-```bash
-npx tsc --noEmit
-```
-
-Build production bundle:
-
-```bash
-npm run build
-```
+| Role | Email | Password | Access & Scope |
+| :--- | :--- | :--- | :--- |
+| **Employee** | `employee@elap.com` | `password123` | Submit leaves, track status, view own balances & history |
+| **Manager** | `manager@elap.com` | `password123` | Tier 1 Action Desk, approve/reject team requests, team history |
+| **HR Lead** | `hr@elap.com` | `password123` | HR Command Center, Tier 2 final sign-off, CSV export, audit logs |
 
 ---
 
-## 📑 Business Rules & Approval Workflow Summary
+## 7. Documentation Index
 
-1. **Leave Quotas**:
-   - **CL (Casual Leave)**: 12 days/year. Maximum 3 consecutive days per request.
-   - **SL (Sick Leave)**: 12 days/year. Medical certificate required for $\ge 3$ consecutive days.
-   - **EL (Earned Leave)**: 15 days/year. Accrues at 1.25 days/month. Must be requested at least 3 days in advance.
-2. **Quota Deduction Policy**:
-   - Available balance = $\text{Annual Quota} - \text{Approved Leaves} - \text{Pending Leaves}$.
-   - Pending requests reserve balance.
-   - **Balance is permanently deducted ONLY when HR grants final Tier 2 approval.**
-3. **Approval Flow**:
-   - `EMPLOYEE` Submits $\rightarrow$ `PENDING_MANAGER` $\rightarrow$ `MANAGER` Endorses $\rightarrow$ `PENDING_HR` $\rightarrow$ `HR` Approves $\rightarrow$ `APPROVED`.
-   - Manager Rejection $\rightarrow$ `REJECTED_BY_MANAGER` (Final, does not reach HR).
-   - Rejection comments are **mandatory** for both Manager and HR tiers.
+- [Architecture Design](docs/architecture.md)
+- [Database Schema & ER Model](docs/database.md)
+- [REST API Specifications](docs/api.md)
+- [Deployment Guide (Vercel + Render)](docs/deployment.md)
+- [Testing & Verification Guide](docs/testing.md)
+
+---
+
+## 8. License
+
+Distributed under the MIT License. See `LICENSE` for details.

@@ -1,34 +1,55 @@
-# dependencies
-/node_modules
-/.pnp
+# Environment files & secrets (NEVER COMMIT TO GIT)
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp
 .pnp.js
 .yarn/install-state.gz
 
-# testing
-/coverage
-
-# next.js
-/.next/
+# Build & Compiled Output
+dist/
+**/dist/
+build/
+**/build/
+.next/
 /out/
+*.tsbuildinfo
 
-# production
-/build
+# Database files & SQLite local DBs
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+backend/prisma/dev.db
+prisma/dev.db
 
-# misc
-.DS_Store
-*.pem
+# Uploads & Temporary files
+uploads/
+**/uploads/
+scratch/
+tmp/
 
-# debug
+# Logs & Credentials
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.pem
+*.key
+*.cert
 
-# local env files
-.env*.local
-.env
-
-# vercel
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
 .vercel
-
-# typescript
-*.tsbuildinfo

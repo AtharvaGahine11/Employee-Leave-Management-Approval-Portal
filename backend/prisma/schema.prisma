@@ -1,0 +1,176 @@
+// ELAP - Employee Leave Management & Approval Portal
+// Production-Ready Prisma Schema (PostgreSQL & SQLite Compatible)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Department {
+  id          String     @id @default(uuid())
+  code        String     @unique // FIN, MKT, IT, PROC, LEG, OPS, ADMIN, CS
+  name        String     @unique
+  active      Boolean    @default(true)
+  employees   Employee[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Employee {
+  id                 String           @id @default(uuid())
+  firebaseUid        String           @unique
+  employeeId         String           @unique // e.g. "EMP-1001"
+  username           String?          @unique
+  passwordHash       String?
+  name               String
+  email              String           @unique
+  role               String           @default("EMPLOYEE") // EMPLOYEE, MANAGER, HR
+  designation        String
+  phone              String?
+  joiningDate        DateTime
+  active             Boolean          @default(true)
+  departmentId       String
+  department         Department       @relation(fields: [departmentId], references: [id])
+
+  // Self-referential reporting manager relationship
+  managerId          String?
+  manager            Employee?        @relation("ReportingHierarchy", fields: [managerId], references: [id])
+  directReports      Employee[]       @relation("ReportingHierarchy")
+
+  balances           LeaveBalance[]
+  requests           LeaveRequest[]   @relation("ApplicantRequests")
+  approvals          Approval[]       @relation("ApproverActions")
+  comments           Comment[]
+  attachments        Attachment[]     @relation("Uploader")
+  auditLogs          AuditLog[]       @relation("Actor")
+  notifications      Notification[]
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model LeaveType {
+  id                 String           @id @default(uuid())
+  code               String           @unique // CL, SL, EL
+  name               String
+  annualEntitlement  Int
+  maxConsecutive     Int?
+  carryForward       Boolean          @default(false)
+  maxCarryForward    Int              @default(0)
+  encashment         Boolean          @default(false)
+  minNoticeDays      Int              @default(0)
+  active             Boolean          @default(true)
+
+  balances           LeaveBalance[]
+  requests           LeaveRequest[]
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model LeaveBalance {
+  id                 String           @id @default(uuid())
+  employeeId         String
+  employee           Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId        String
+  leaveType          LeaveType        @relation(fields: [leaveTypeId], references: [id])
+  year               Int              @default(2026)
+  openingBalance     Float
+  approvedDays       Float            @default(0)
+  pendingDays        Float            @default(0)
+  availableDays      Float
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+model LeaveRequest {
+  id                 String           @id @default(uuid())
+  requestId          String           @unique // e.g. "LR-2026-001"
+  employeeId         String
+  employee           Employee         @relation("ApplicantRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId        String
+  leaveType          LeaveType        @relation(fields: [leaveTypeId], references: [id])
+  startDate          DateTime
+  endDate            DateTime
+  daysCount          Float
+  reason             String
+  status             String           @default("DRAFT") // DRAFT, PENDING_MANAGER, PENDING_HR, ESCALATED, APPROVED, REJECTED_BY_MANAGER, REJECTED_BY_HR, CANCELLED
+  submittedAt        DateTime?
+
+  approvals          Approval[]
+  comments           Comment[]
+  attachments        Attachment[]
+  auditLogs          AuditLog[]
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model Approval {
+  id                 String           @id @default(uuid())
+  leaveRequestId     String
+  leaveRequest       LeaveRequest     @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  approverId         String
+  approver           Employee         @relation("ApproverActions", fields: [approverId], references: [id])
+  tier               String           // MANAGER or HR
+  decision           String           // APPROVED, REJECTED_BY_MANAGER, REJECTED_BY_HR
+  comment            String?
+  actedAt            DateTime         @default(now())
+}
+
+model Comment {
+  id                 String           @id @default(uuid())
+  leaveRequestId     String
+  leaveRequest       LeaveRequest     @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  authorId           String
+  author             Employee         @relation(fields: [authorId], references: [id])
+  body               String
+  createdAt          DateTime         @default(now())
+}
+
+model Attachment {
+  id                 String           @id @default(uuid())
+  leaveRequestId     String
+  leaveRequest       LeaveRequest     @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  uploaderId         String
+  uploader           Employee         @relation("Uploader", fields: [uploaderId], references: [id])
+  publicId           String
+  url                String
+  fileName           String
+  mimeType           String
+  size               Int
+  createdAt          DateTime         @default(now())
+}
+
+model AuditLog {
+  id                 String           @id @default(uuid())
+  leaveRequestId     String?
+  leaveRequest       LeaveRequest?    @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  actorId            String
+  actor              Employee         @relation("Actor", fields: [actorId], references: [id])
+  actorRole          String           // EMPLOYEE, MANAGER, HR
+  action             String           // LEAVE_CREATED, LEAVE_SUBMITTED, MANAGER_APPROVED, MANAGER_REJECTED, HR_APPROVED, HR_REJECTED, LEAVE_CANCELLED, COMMENT_ADDED, ATTACHMENT_UPLOADED, REMINDER_SENT, ESCALATED
+  previousStatus     String?
+  newStatus          String?
+  metadata           String?          // JSON metadata stringified
+  timestamp          DateTime         @default(now())
+}
+
+model Notification {
+  id                 String           @id @default(uuid())
+  recipientId        String
+  recipient          Employee         @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  title              String
+  message            String
+  type               String           @default("INFO") // INFO, SUCCESS, WARNING, DANGER
+  read               Boolean          @default(false)
+  link               String?
+  createdAt          DateTime         @default(now())
+}
