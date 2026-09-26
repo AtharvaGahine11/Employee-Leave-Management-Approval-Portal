@@ -26,20 +26,21 @@ app.use(
       // Allow requests with no origin (like mobile apps, curl, or server-to-server)
       if (!origin) return callback(null, true);
 
-      // In development, allow all localhost and 127.0.0.1 origins on any port
+      // Allow localhost, 127.0.0.1, Vercel deployments, or explicit clientUrl
       if (
         config.nodeEnv === 'development' ||
         origin.startsWith('http://localhost:') ||
         origin.startsWith('http://127.0.0.1:') ||
         origin === config.clientUrl ||
         origin === config.socketOrigin ||
-        origin.endsWith('.vercel.app')
+        origin.includes('vercel.app') ||
+        config.clientUrl === '*'
       ) {
         return callback(null, true);
       }
 
       const allowed = [config.clientUrl, config.socketOrigin, 'http://localhost:3000', 'http://localhost:3001'];
-      if (allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      if (allowed.includes(origin) || origin.includes('vercel.app')) {
         return callback(null, true);
       }
 
