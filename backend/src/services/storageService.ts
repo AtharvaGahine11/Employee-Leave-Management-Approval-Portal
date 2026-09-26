@@ -4,15 +4,23 @@ import { logger } from '../utils/logger.js';
 
 let supabaseClient: SupabaseClient | null = null;
 
-const supabaseKey = config.supabase.serviceKey || config.supabase.anonKey;
-if (config.supabase.url && supabaseKey) {
-  supabaseClient = createClient(config.supabase.url, supabaseKey, {
-    auth: { persistSession: false },
-  });
-  logger.info(`📦 Supabase Storage Client initialized for URL: ${config.supabase.url}`);
-} else {
-  logger.info(`📦 Supabase Storage credentials not detected; using base64 data URI fallback mode.`);
-}
+export const getSupabaseClient = (): SupabaseClient | null => {
+  if (supabaseClient) return supabaseClient;
+  const supabaseKey = config.supabase.serviceKey || config.supabase.anonKey;
+  if (config.supabase.url && supabaseKey) {
+    supabaseClient = createClient(config.supabase.url, supabaseKey, {
+      auth: { persistSession: false },
+    });
+    logger.info(`📦 Supabase Storage Client initialized for URL: ${config.supabase.url}`);
+    ensureStorageBucket().catch((err) => logger.warn('Failed to ensure Supabase bucket:', err));
+  } else {
+    logger.info(`📦 Supabase Storage credentials not detected (missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY). Base64 data URI fallback active.`);
+  }
+  return supabaseClient;
+};
+
+// Initialize on module load
+getSupabaseClient();
 
 export interface MulterFile {
   fieldname?: string;
@@ -43,9 +51,10 @@ export const uploadFileToStorage = async (
   const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
   const filePath = `${folder}/${Date.now()}-${sanitizedName}`;
 
-  if (supabaseClient) {
+  const client = getSupabaseClient();
+  if (client) {
     try {
-      const { data, error } = await supabaseClient.storage
+      const { data, error } = await client.storage
         .from(bucketName)
         .upload(filePath, file.buffer, {
           contentType: file.mimetype,
@@ -55,7 +64,7 @@ export const uploadFileToStorage = async (
       if (error) {
         logger.warn(`⚠️ Supabase upload returned error: ${error.message}. Falling back to base64 encoding.`);
       } else if (data) {
-        const { data: urlData } = supabaseClient.storage
+        const { data: urlData } = client.storage
           .from(bucketName)
           .getPublicUrl(data.path);
 
@@ -87,16 +96,17 @@ export const uploadFileToStorage = async (
  * Helper to check or create the bucket if service role key is present
  */
 export const ensureStorageBucket = async () => {
-  if (!supabaseClient) return false;
+  const client = getSupabaseClient();
+  if (!client) return false;
   try {
     const bucketName = config.supabase.bucket || 'leave-attachments';
-    const { data: buckets } = await supabaseClient.storage.listBuckets();
-    const exists = buckets?.some((b) => b.name === bucketName);
+    const { data: buckets } = await client.storage.listBuckets();
+    const exists = buckets?.some((b: any) => b.name === bucketName);
 
     if (!exists && config.supabase.serviceKey) {
-      const { error } = await supabaseClient.storage.createBucket(bucketName, {
+      const { error } = await client.storage.createBucket(bucketName, {
         public: true,
-        fileSizeLimit: 5242880, // 5MB
+        fileSizeLimit: 10485760, // 10MB
         allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
       });
       if (error) {

@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { initFirebaseAdmin } from './config/firebase.js';
+import { ensureStorageBucket } from './services/storageService.js';
 import { initSocketIO } from './socket/socketManager.js';
 import apiRouter from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -15,8 +16,9 @@ import { runInactionCheckJob } from './modules/scheduledJobs/cronJobs.js';
 const app = express();
 const server = http.createServer(app);
 
-// 1. Initialize Firebase Admin SDK
+// 1. Initialize Services
 initFirebaseAdmin();
+ensureStorageBucket().catch((err) => logger.warn('Storage bucket check warning:', err));
 
 // 2. Security Middleware (Helmet & CORS)
 app.use(helmet());
