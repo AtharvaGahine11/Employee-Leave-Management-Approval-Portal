@@ -6,6 +6,9 @@
     "frontend",
     "backend"
   ],
+  "bin": {
+    "next": "./bin/next.js"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "dev:backend": "npm run dev --workspace=backend",
@@ -14,6 +17,7 @@
     "build:frontend": "npm run build --workspace=frontend",
     "build": "npm run prisma:generate --workspace=backend && npm run build:backend && npm run build:frontend",
     "vercel-build": "npm run prisma:generate --workspace=backend && npm run build:backend && npm run build:frontend",
+    "next": "node ./bin/next.js",
     "prisma:generate": "npm run prisma:generate --workspace=backend",
     "prisma:migrate": "npm run prisma:migrate --workspace=backend",
     "prisma:seed": "npm run seed --workspace=backend"
