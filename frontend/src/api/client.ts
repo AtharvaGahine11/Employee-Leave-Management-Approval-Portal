@@ -3,11 +3,26 @@ import axios from 'axios';
 const isDev = import.meta.env.DEV;
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-// In production, fallback to same-domain relative /api/v1 even if localhost was accidentally passed in Vercel
-const API_BASE_URL =
-  !isDev && (!rawBaseUrl || rawBaseUrl.includes('localhost'))
-    ? '/api/v1'
-    : (rawBaseUrl || (isDev ? 'http://localhost:5001/api/v1' : '/api/v1'));
+// Normalize API_BASE_URL: ensure it points to the backend /api/v1 endpoint
+const getBaseUrl = (): string => {
+  if (rawBaseUrl && !rawBaseUrl.includes('localhost')) {
+    const trimmed = rawBaseUrl.trim().replace(/\/+$/, '');
+    if (trimmed.endsWith('/api/v1')) return trimmed;
+    if (trimmed.endsWith('/api')) return `${trimmed}/v1`;
+    return `${trimmed}/api/v1`;
+  }
+  if (rawBaseUrl && isDev) {
+    const trimmed = rawBaseUrl.trim().replace(/\/+$/, '');
+    if (trimmed.endsWith('/api/v1')) return trimmed;
+    if (trimmed.endsWith('/api')) return `${trimmed}/v1`;
+    return `${trimmed}/api/v1`;
+  }
+  return isDev
+    ? 'http://localhost:5001/api/v1'
+    : 'https://employee-leave-management-approval-portal.onrender.com/api/v1';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
