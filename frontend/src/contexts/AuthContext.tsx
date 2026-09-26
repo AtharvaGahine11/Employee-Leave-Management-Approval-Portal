@@ -20,6 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (identifier: string, password?: string) => Promise<UserProfile>;
   register: (data: Parameters<typeof authApi.register>[0]) => Promise<UserProfile>;
+  completeRegistration: (data: Parameters<typeof authApi.register>[0]) => Promise<UserProfile>;
   loginWithGoogle: () => Promise<UserProfile>;
   loginWithApple: () => Promise<UserProfile>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -63,7 +64,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (identifier: string, password?: string): Promise<UserProfile> => {
     setIsLoading(true);
     try {
+      // 1. If logging in with email, verify whether Firebase requires email verification
+      if (identifier.includes('@') && password) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, identifier.trim(), password);
+          if (cred.user && !cred.user.emailVerified) {
+            await cred.user.reload();
+            if (!cred.user.emailVerified) {
+              const err: any = new Error('EMAIL_NOT_VERIFIED');
+              err.code = 'EMAIL_NOT_VERIFIED';
+              throw err;
+            }
+          }
+        } catch (fbErr: any) {
+          if (fbErr.code === 'EMAIL_NOT_VERIFIED' || fbErr.message === 'EMAIL_NOT_VERIFIED') {
+            throw fbErr;
+          }
+          // Seeded/admin users without Firebase records continue to database auth
+        }
+      }
+
+      // 2. Authenticate with backend API
       const res = await authApi.login(identifier.trim(), password);
+      localStorage.setItem('elap_token', res.token);
+      setToken(res.token);
+      setUser(res.user);
+      setBalances(res.balances);
+      return res.user;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const completeRegistration = async (data: Parameters<typeof authApi.register>[0]): Promise<UserProfile> => {
+    setIsLoading(true);
+    try {
+      const res = await authApi.register(data);
       localStorage.setItem('elap_token', res.token);
       setToken(res.token);
       setUser(res.user);
@@ -185,6 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         register,
+        completeRegistration,
         loginWithGoogle,
         loginWithApple,
         changePassword,

@@ -19,9 +19,17 @@ import {
 import { validateWorkEmail } from '../../utils/workEmailSecurity';
 import { DEFAULT_DEPARTMENTS } from '../../constants/departments';
 import { getDashboardPathForRole } from '../../routes/AppRoutes';
+import {
+  auth,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+} from '../../config/firebase';
+import { EmailVerificationCard } from '../../components/auth/EmailVerificationCard';
 
 export const LoginPage: React.FC = () => {
-  const { user, login, register, loginWithGoogle, loginWithApple } = useAuth();
+  const { user, login, completeRegistration, loginWithGoogle, loginWithApple } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -52,6 +60,9 @@ export const LoginPage: React.FC = () => {
   const [regPassword, setRegPassword] = useState('');
   const [regDepartmentId, setRegDepartmentId] = useState<string>(DEFAULT_DEPARTMENTS[0].id);
   const [regDesignation, setRegDesignation] = useState('');
+
+  // Email verification state
+  const [pendingVerification, setPendingVerification] = useState<any | null>(null);
 
   // Loading states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,7 +104,15 @@ export const LoginPage: React.FC = () => {
       showSuccess('Signed in successfully!');
       navigate(getDashboardPathForRole(loggedUser?.role));
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Invalid username/email or password.');
+      if (err.code === 'EMAIL_NOT_VERIFIED' || err.message === 'EMAIL_NOT_VERIFIED') {
+        setPendingVerification({
+          email: identifier.trim(),
+          isExistingLogin: true,
+        });
+        showError('Please authorize your email link first before accessing your dashboard.');
+        return;
+      }
+      showError(err.response?.data?.message || err.message || 'Invalid username/email or password.');
     } finally {
       setIsSubmitting(false);
     }
@@ -133,7 +152,50 @@ export const LoginPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const newUser = await register({
+
+      // 1. Create or retrieve user in Firebase Auth and dispatch email verification link
+      let firebaseUid = '';
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, regEmail.toLowerCase().trim(), regPassword);
+        firebaseUid = cred.user.uid;
+        if (regName.trim()) {
+          await updateProfile(cred.user, { displayName: regName.trim() });
+        }
+        await sendEmailVerification(cred.user);
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/email-already-in-use') {
+          // If already in Firebase, check verification status or resend verification link
+          try {
+            const cred = await signInWithEmailAndPassword(auth, regEmail.toLowerCase().trim(), regPassword);
+            firebaseUid = cred.user.uid;
+            if (!cred.user.emailVerified) {
+              await sendEmailVerification(cred.user);
+            } else {
+              // Email already verified in Firebase! Direct activate
+              const newUser = await completeRegistration({
+                name: regName.trim(),
+                username: cleanUsername,
+                email: regEmail.toLowerCase().trim(),
+                password: regPassword,
+                role: regRole,
+                departmentId: regRole === 'EMPLOYEE' ? regDepartmentId : undefined,
+                designation: regDesignation.trim() || undefined,
+                firebaseUid,
+              });
+              showSuccess(`Account @${cleanUsername} verified! Welcome to ELAP.`);
+              navigate(getDashboardPathForRole(newUser?.role));
+              return;
+            }
+          } catch {
+            throw new Error('This email address is already registered. If it is yours, please sign in.');
+          }
+        } else {
+          throw fbErr;
+        }
+      }
+
+      // 2. Set pending verification state - DO NOT redirect until user verifies email!
+      setPendingVerification({
         name: regName.trim(),
         username: cleanUsername,
         email: regEmail.toLowerCase().trim(),
@@ -141,13 +203,13 @@ export const LoginPage: React.FC = () => {
         role: regRole,
         departmentId: regRole === 'EMPLOYEE' ? regDepartmentId : undefined,
         designation: regDesignation.trim() || undefined,
+        firebaseUid,
       });
 
-      showSuccess(`Account @${cleanUsername} (${regRole}) created! A Firebase Auth verification link was dispatched to ${regEmail.trim()}.`);
-      navigate(getDashboardPathForRole(newUser?.role));
+      showSuccess(`Authorization link sent to ${regEmail.trim()}. Please verify your email to activate your account.`);
     } catch (err: any) {
       console.error(err);
-      showError(err.response?.data?.message || 'Failed to create account. Please try again.');
+      showError(err.response?.data?.message || err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +282,34 @@ export const LoginPage: React.FC = () => {
       {/* Main Authentication Area */}
       <main className="flex-1 flex flex-col justify-center items-center px-4 py-8 sm:py-12">
         <div className="w-full max-w-[460px]">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
+          {pendingVerification ? (
+            <EmailVerificationCard
+              email={pendingVerification.email}
+              userName={pendingVerification.name}
+              onVerified={async () => {
+                if (pendingVerification.isExistingLogin) {
+                  try {
+                    setIsSubmitting(true);
+                    const loggedUser = await login(identifier, password);
+                    showSuccess('Email verified! Signed in successfully.');
+                    navigate(getDashboardPathForRole(loggedUser?.role));
+                  } catch (err: any) {
+                    showError(err.response?.data?.message || err.message || 'Error signing in.');
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                } else {
+                  const newUser = await completeRegistration(pendingVerification);
+                  showSuccess(`Account @${pendingVerification.username} activated! Welcome to ELAP.`);
+                  navigate(getDashboardPathForRole(newUser?.role));
+                }
+              }}
+              onCancel={() => {
+                setPendingVerification(null);
+              }}
+            />
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
             {/* Segmented Switcher (Sign In vs Create Account) */}
             <div className="grid grid-cols-2 p-1 bg-slate-100/90 rounded-xl mb-6 text-xs font-semibold">
               <button
@@ -673,6 +762,7 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
           </div>
+          )}
         </div>
       </main>
 

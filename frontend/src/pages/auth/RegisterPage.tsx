@@ -5,6 +5,14 @@ import { useToast } from '../../contexts/ToastContext';
 import { departmentApi } from '../../api';
 import { Department } from '../../types';
 import {
+  auth,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+} from '../../config/firebase';
+import { EmailVerificationCard } from '../../components/auth/EmailVerificationCard';
+import {
   Eye,
   EyeOff,
   ArrowRight,
@@ -24,7 +32,7 @@ import { DEFAULT_DEPARTMENTS } from '../../constants/departments';
 import { getDashboardPathForRole } from '../../routes/AppRoutes';
 
 export const RegisterPage: React.FC = () => {
-  const { user, register } = useAuth();
+  const { user, completeRegistration } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
 
@@ -46,6 +54,7 @@ export const RegisterPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchDepts = async () => {
@@ -100,7 +109,51 @@ export const RegisterPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const newUser = await register({
+
+      // 1. Create or retrieve user in Firebase Auth and dispatch email verification link
+      let firebaseUid = '';
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email.toLowerCase().trim(), password);
+        firebaseUid = cred.user.uid;
+        if (name.trim()) {
+          await updateProfile(cred.user, { displayName: name.trim() });
+        }
+        await sendEmailVerification(cred.user);
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/email-already-in-use') {
+          // If already in Firebase, check verification status or resend verification link
+          try {
+            const cred = await signInWithEmailAndPassword(auth, email.toLowerCase().trim(), password);
+            firebaseUid = cred.user.uid;
+            if (!cred.user.emailVerified) {
+              await sendEmailVerification(cred.user);
+            } else {
+              // Email already verified in Firebase! Direct activate
+              const newUser = await completeRegistration({
+                name: name.trim(),
+                username: cleanUsername,
+                email: email.toLowerCase().trim(),
+                password,
+                role,
+                departmentId: role === 'EMPLOYEE' ? departmentId : undefined,
+                designation: designation.trim() || undefined,
+                phone: phone.trim() || undefined,
+                firebaseUid,
+              });
+              showSuccess(`Account @${cleanUsername} verified! Welcome to ELAP.`);
+              navigate(getDashboardPathForRole(newUser?.role));
+              return;
+            }
+          } catch {
+            throw new Error('This email address is already registered. If it is yours, please sign in.');
+          }
+        } else {
+          throw fbErr;
+        }
+      }
+
+      // 2. Set pending verification state - DO NOT redirect until user verifies email!
+      setPendingVerification({
         name: name.trim(),
         username: cleanUsername,
         email: email.toLowerCase().trim(),
@@ -109,13 +162,13 @@ export const RegisterPage: React.FC = () => {
         departmentId: role === 'EMPLOYEE' ? departmentId : undefined,
         designation: designation.trim() || undefined,
         phone: phone.trim() || undefined,
+        firebaseUid,
       });
 
-      showSuccess(`Account @${cleanUsername} (${role}) created! A Firebase Auth verification link was dispatched to ${email.trim()}.`);
-      navigate(getDashboardPathForRole(newUser?.role));
+      showSuccess(`Authorization link sent to ${email.trim()}. Please verify your email to activate your account.`);
     } catch (err: any) {
       console.error(err);
-      showError(err.response?.data?.message || 'Failed to create account. Please try again.');
+      showError(err.response?.data?.message || err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -162,9 +215,23 @@ export const RegisterPage: React.FC = () => {
 
       {/* Center Register Card */}
       <div className="w-full max-w-[500px] my-6">
-        <div className="bg-white rounded-[32px] border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-7 sm:p-9 space-y-6">
-          {/* Card Header */}
-          <div className="text-center space-y-1">
+        {pendingVerification ? (
+          <EmailVerificationCard
+            email={pendingVerification.email}
+            userName={pendingVerification.name}
+            onVerified={async () => {
+              const newUser = await completeRegistration(pendingVerification);
+              showSuccess(`Account @${pendingVerification.username} activated! Welcome to ELAP.`);
+              navigate(getDashboardPathForRole(newUser?.role));
+            }}
+            onCancel={() => {
+              setPendingVerification(null);
+            }}
+          />
+        ) : (
+          <div className="bg-white rounded-[32px] border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-7 sm:p-9 space-y-6">
+            {/* Card Header */}
+            <div className="text-center space-y-1">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-3xs font-extrabold uppercase border border-indigo-100 mb-1">
               <Sparkles className="w-3 h-3 text-indigo-600" />
               <span>Create Workspace Profile</span>
@@ -450,7 +517,8 @@ export const RegisterPage: React.FC = () => {
             </p>
           </div>
         </div>
-      </div>
+      )}
+    </div>
 
       {/* Bottom Footer */}
       <footer className="w-full max-w-4xl mx-auto py-3 px-2 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2">
