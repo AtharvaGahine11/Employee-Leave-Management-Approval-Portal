@@ -258,7 +258,7 @@ export const LandingPage: React.FC = () => {
                       <div className="pt-2 flex items-center justify-between">
                         <div>
                           <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                            Good Morning, Sameer
+                            Good Morning,
                           </h4>
                           <p className="text-[10px] text-slate-400">Here's your leave overview.</p>
                         </div>
